@@ -56,6 +56,16 @@ void createAndLinkSortShader()
 void GPURadixSort(GLuint buffer, GLuint outputBuffer, int size)
 {
 
+    //create query object
+    GLuint startTimeQuery, endTimeQuery;
+    glGenQueries(1, &startTimeQuery);
+    glGenQueries(1, &endTimeQuery);
+    GLint64 startTime, endTime;
+
+    //measure GPU time
+
+
+
 
     //get number of work groups
     int workGroupCount = ceil(size / 128.0f);
@@ -66,12 +76,28 @@ void GPURadixSort(GLuint buffer, GLuint outputBuffer, int size)
     //bind buffer
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, outputBuffer);
+    //create and bind the shared histogram buffer, of length size
+    GLuint histogramBuffer;
+    glGenBuffers(1, &histogramBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, size * sizeof(int), nullptr, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, histogramBuffer);
+    glQueryCounter(startTimeQuery, GL_TIMESTAMP);
     glDispatchCompute(1, 1, 1);
     //wait for shader to finish
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-    int timeTaken = glfwGetTime() - currentTime;
-    //print time taken
-    std::cout << "Time taken: " << timeTaken << " seconds" << std::endl;
+
+    glQueryCounter(endTimeQuery, GL_TIMESTAMP);
+
+    //get time taken
+    glGetQueryObjecti64v(startTimeQuery, GL_QUERY_RESULT, &startTime);
+    glGetQueryObjecti64v(endTimeQuery, GL_QUERY_RESULT, &endTime);
+
+    double timeTaken = (endTime - startTime) / 1000000000.f;
+
+
+    //print time taken. Do not round down to 0
+    std::cout << "GPU sort took " << timeTaken << " seconds" << std::endl;
 
 }
 

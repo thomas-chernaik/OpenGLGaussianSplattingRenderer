@@ -116,7 +116,6 @@ void radixSort()
 
 //create tests for the sort function
 TEST(SortTest, SortTest) {
-    radixSort();
     //intialise glfw
     if (!glfwInit()) {
         std::cerr << "Failed to initialise GLFW" << std::endl;
@@ -158,7 +157,7 @@ TEST(SortTest, SortTest) {
     glGenBuffers(1, &outputBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputBuffer);
     //create random numbers
-    std::vector<int> randomNumbers = createRandomNumbersInt(256*16*2, 1100000);
+    std::vector<int> randomNumbers = createRandomNumbersInt(256*16*128, 1073741825);
     //fill the input buffer with random numbers
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, randomNumbers.size() * sizeof(int), randomNumbers.data(), GL_STATIC_DRAW);
@@ -170,7 +169,9 @@ TEST(SortTest, SortTest) {
     //run program
     GPURadixSort(buffer, outputBuffer, randomNumbers.size());
     //sort random numbers on cpu
+    double currentTime = glfwGetTime();
     std::sort(randomNumbers.begin(), randomNumbers.end());
+    std::cout << "CPU sort took " << glfwGetTime() - currentTime << " seconds" << std::endl;
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputBuffer);
     int* outputBufferData = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
     //copy buffer data to vector
@@ -179,8 +180,10 @@ TEST(SortTest, SortTest) {
     try{
         //get buffer data
         for (int i = 0; i < randomNumbers.size(); i++) {
-            ASSERT_EQ(randomNumbers[i], outputBufferData[i]);
+            ASSERT_GE(outputBufferVector[i], outputBufferVector[i - 1]);
+            ASSERT_EQ(outputBufferVector[i], randomNumbers[i]);
         }
+        std::cout << "Successfully sorted " << randomNumbers.size() << " numbers" << std::endl;
     } catch (std::exception& e) {
         //fail test
         FAIL();

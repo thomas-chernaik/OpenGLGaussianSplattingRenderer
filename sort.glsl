@@ -5,16 +5,19 @@ layout (binding = 0)  buffer InputBuffer {
     int data[];
 } inputBuffer;
 
-//the array to store the prefix sum for the work group
-shared int sharedHistogram[256*16*2];
 
 //the output buffer
 layout (binding = 1) buffer OutputBuffer {
     int data[];
 } outputBuffer;
 
+//the shared histogram in global memory
+layout (binding = 2) buffer SharedHistogram {
+    int data[];
+} sharedHistogramBuffer;
+
 int numSegments = 256;
-const int segmentSize = 16*2;
+const int segmentSize = 16*128;
 const int keySize = 16;
 
 void main()
@@ -22,10 +25,7 @@ void main()
     for (int segment = 0; segment < 8; segment++)
     {
         int startIdx = int(gl_LocalInvocationID.x) * segmentSize;
-        //initialise the shared memory
-        for (int i = startIdx; i < startIdx + segmentSize; i++) {
-            sharedHistogram[i] = 0;
-        }
+
         int mask = 0x0000000F << (segment * 4);
         int histogram[keySize];
         for (int i = 0; i < keySize; i++) {
@@ -38,7 +38,7 @@ void main()
         }
         //write the histogram to the shared memory
         for (int i = startIdx; i < startIdx + segmentSize; i++) {
-            sharedHistogram[i] = histogram[i - startIdx];
+            sharedHistogramBuffer.data[i] = histogram[i - startIdx];
         }
 
         //wait for all threads to finish writing to the shared memory
@@ -61,7 +61,7 @@ void main()
                 {
                     offsets[j] = globalHistogram[j];
                 }
-                globalHistogram[j] += sharedHistogram[i + j];
+                globalHistogram[j] += sharedHistogramBuffer.data[i + j];
             }
         }
         //compute the global prefix sum
