@@ -16,83 +16,107 @@ void radixSort()
     std::vector<int> outputBuffer = createRandomNumbersInt(256*16, 16);
     //initialise the "shared memory" (vector) for the local work group
     std::vector<int> sharedHistogram(256*16);
-    for(int gl_LocalInvocationIndex=0; gl_LocalInvocationIndex < 256; gl_LocalInvocationIndex++)
+    for(int segment = 0; segment < 2; segment++)
     {
-        int startIdx = gl_LocalInvocationIndex * 16;
-        for(int i = startIdx; i < startIdx + 16; i++)
+        for (int gl_LocalInvocationIndex = 0; gl_LocalInvocationIndex < 256; gl_LocalInvocationIndex++)
         {
-            sharedHistogram[i] = 0;
-        }
-        int mask = 0x0000000F;
-        //create the histogram for this "thread"
-        int histogram[16];
-        for(int i = 0; i < 16; i++)
-        {
-            histogram[i] = 0;
-        }
-        for(int i = startIdx; i < startIdx + 16; i++)
-        {
-            int index = buffer[i] & mask;
-            histogram[index]++;
-        }
-        //write the histogram to the shared memory
-        for(int i = startIdx; i < startIdx + 16; i++)
-        {
-            sharedHistogram[i] = histogram[i & mask];
-        }
-    }
-    //"wait" for all threads to finish
-    for(int gl_LocalInvocationIndex=0; gl_LocalInvocationIndex < 256; gl_LocalInvocationIndex++)
-    {
-        int startIdx = gl_LocalInvocationIndex * 16;
-        //we need the local offset, from the start of the thread
-        int offsets[16];
-        //we need the global offset, from the start of the buffer
-        int globalPrefixSum[16];
-        for(int i = 0; i < 16; i++)
-        {
-            offsets[i] = 0;
-            globalPrefixSum[i] = 0;
-        }
-
-        //compute the global prefix sum
-        //for each thread
-        int globalHistogram[16];
-        for(int i = 0; i < 16; i++)
-        {
-            globalHistogram[i] = 0;
-        }
-        for(int i=0; i<256*16; i+=16)
-        {
-            for(int j=0; j<16; j++)
+            int startIdx = gl_LocalInvocationIndex * 16;
+            for (int i = startIdx; i < startIdx + 16; i++)
             {
-                if(int(i/16) == gl_LocalInvocationIndex)
-                {
-                    offsets[j] = globalHistogram[j];
-                }
-                globalHistogram[j] += sharedHistogram[i+j];
+                sharedHistogram[i] = 0;
+            }
+            int mask = 0x0000000F << (segment * 4);
+            //create the histogram for this "thread"
+            int histogram[16];
+            for (int i = 0; i < 16; i++)
+            {
+                histogram[i] = 0;
+            }
+            for (int i = startIdx; i < startIdx + 16; i++)
+            {
+                int index = (buffer[i] & mask) >> (segment * 4);
+                histogram[index]++;
+            }
+            //write the histogram to the shared memory
+            for (int i = startIdx; i < startIdx + 16; i++)
+            {
+                sharedHistogram[i] = histogram[i - startIdx];
             }
         }
-        globalPrefixSum[0] = 0;
-        for(int i = 1; i < 16; i++)
+        //"wait" for all threads to finish
+        for (int gl_LocalInvocationIndex = 0; gl_LocalInvocationIndex < 256; gl_LocalInvocationIndex++)
         {
-            globalPrefixSum[i] = globalHistogram[i-1] + globalPrefixSum[i-1];
+            int startIdx = gl_LocalInvocationIndex * 16;
+            int mask = 0x0000000F << (segment * 4);
+            //we need the local offset, from the start of the thread
+            int offsets[16];
+            //we need the global offset, from the start of the buffer
+            int globalPrefixSum[16];
+            for (int i = 0; i < 16; i++)
+            {
+                offsets[i] = 0;
+                globalPrefixSum[i] = 0;
+            }
+
+            //compute the global prefix sum
+            //for each thread
+            int globalHistogram[16];
+            for (int i = 0; i < 16; i++)
+            {
+                globalHistogram[i] = 0;
+            }
+            for (int i = 0; i < 256 * 16; i += 16)
+            {
+                for (int j = 0; j < 16; j++)
+                {
+                    if (i == startIdx)
+                    {
+                        offsets[j] = globalHistogram[j];
+                    }
+                    globalHistogram[j] += sharedHistogram[i + j];
+                }
+            }
+            globalPrefixSum[0] = 0;
+            for (int i = 1; i < 16; i++)
+            {
+                globalPrefixSum[i] = globalHistogram[i - 1] + globalPrefixSum[i - 1];
+            }
+            //write the output buffer
+            for (int i = startIdx; i < startIdx + 16; i++)
+            {
+                int index = (buffer[i] & mask) >> (segment * 4);
+                outputBuffer[globalPrefixSum[index] + offsets[index]] = buffer[i];
+                offsets[index]++;
+            }
+
         }
-        //write the output buffer
-        for(int i = startIdx; i < startIdx + 16; i++)
-        {
-            int index = buffer[i] & 0x0000000F;
-            outputBuffer[globalPrefixSum[index] + offsets[index]] = buffer[i];
-            offsets[index]++;
-        }
+
+        //swap the buffers
+        std::vector<int> temp = buffer;
+        buffer = outputBuffer;
+        //outputBuffer = temp;
 
     }
     std::cout << "finished" << std::endl;
+    //check buffer is sorted
+    try{
+        //get buffer data
+        for (int i = 0; i < buffer.size() - 1; i++) {
+            if (outputBuffer[i] > outputBuffer[i + 1]) {
+                //std::cerr << "Error: buffer is not sorted" << std::endl;
+                return;
+            }
+        }
+        std::cout << "Buffer is sorted" << std::endl;
+    } catch (std::exception& e) {
+        std::cerr << "Error: buffer is not sorted" << std::endl;
+        return;
+    }
 }
 
 //create tests for the sort function
 TEST(SortTest, SortTest) {
-    //();
+    radixSort();
     //intialise glfw
     if (!glfwInit()) {
         std::cerr << "Failed to initialise GLFW" << std::endl;
@@ -134,7 +158,7 @@ TEST(SortTest, SortTest) {
     glGenBuffers(1, &outputBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputBuffer);
     //create random numbers
-    std::vector<int> randomNumbers = createRandomNumbersInt(256*16, 16);
+    std::vector<int> randomNumbers = createRandomNumbersInt(256*16*2, 1100000);
     //fill the input buffer with random numbers
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, randomNumbers.size() * sizeof(int), randomNumbers.data(), GL_STATIC_DRAW);
