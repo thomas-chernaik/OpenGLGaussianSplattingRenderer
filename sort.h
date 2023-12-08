@@ -55,7 +55,6 @@ void createAndLinkSortShader()
 
 void GPURadixSort(GLuint buffer, GLuint outputBuffer, int size)
 {
-
     //create query object
     GLuint startTimeQuery, endTimeQuery;
     glGenQueries(1, &startTimeQuery);
@@ -68,22 +67,33 @@ void GPURadixSort(GLuint buffer, GLuint outputBuffer, int size)
 
 
     //get number of work groups
-    int workGroupCount = ceil(size / 128.0f);
-    int currentTime = glfwGetTime();
-
-    //run shader
+    int workGroupCount = 1;
+    //work out the section size and number of sections
+    int workGroupSize = 256;
+    int numberOfSections = workGroupCount * workGroupSize;
+    int sectionSize = size / numberOfSections;
+    //use the shader program
     glUseProgram(program);
-    //bind buffer
+
+    //bind input and output buffers
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, outputBuffer);
-    //create and bind the shared histogram buffer, of length size
+
+    //create and bind the shared histogram buffer, of length 16 * number of sections
+    int histogramSize = 16 * numberOfSections;
     GLuint histogramBuffer;
     glGenBuffers(1, &histogramBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, size * sizeof(int), nullptr, GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, histogramSize     * sizeof(int), nullptr, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, histogramBuffer);
+
+    //set the uniform variables
+    glUniform1i(glGetUniformLocation(program, "sectionSize"), sectionSize);
+    glUniform1i(glGetUniformLocation(program, "numSections"), numberOfSections);
+
+
     glQueryCounter(startTimeQuery, GL_TIMESTAMP);
-    glDispatchCompute(1, 1, 1);
+    glDispatchCompute(workGroupCount, 1, 1);
     //wait for shader to finish
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
