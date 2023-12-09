@@ -26,6 +26,18 @@ void errorCallback(int error, const char* description) {
     std::cerr << "Error: " << description << std::endl;
 }
 
+std::vector<double> createRandomNumbersDouble(int size, int maxNumber) {
+    if(size < 1) {
+        std::cerr << "Error: size must be greater than 0" << std::endl;
+        return std::vector<double>();
+    }
+    std::vector<double> randomNumbers(size);
+    for (int i = 0; i < size; i++) {
+        randomNumbers[i] = (double)(rand() / maxNumber);
+    }
+    return randomNumbers;
+}
+
 //function to create random numbers to go in a buffer
 //return a vector floats
 std::vector<float> createRandomNumbersFloat(int size) {

@@ -1,2 +1,8 @@
 /.idea
 /cmake-build-debug
+/CMakeFiles/
+/cmake-build-release/
+/cmake_install.cmake
+valgrind.log
+
+

@@ -151,6 +151,7 @@ TEST(SortTest, SortTest) {
 
     std::cout << "compiling shaders" << std::endl;
     createAndLinkSortShader();
+    createAndLinkSortAndHistogramShaders();
     std::cout << "compiled shaders" << std::endl;
 
     //create buffer
@@ -161,18 +162,36 @@ TEST(SortTest, SortTest) {
     GLuint outputBuffer;
     glGenBuffers(1, &outputBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputBuffer);
+    //create order buffer
+    GLuint orderBuffer;
+    glGenBuffers(1, &orderBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, orderBuffer);
     //create random numbers
-    std::vector<int> randomNumbers = createRandomNumbersInt(256*16*128, 1073741825);
+    std::vector<double> randomNumbers = createRandomNumbersDouble(256*16*32, pow(2, 56));
     //fill the input buffer with random numbers
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, randomNumbers.size() * sizeof(int), randomNumbers.data(), GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, randomNumbers.size() * sizeof(double), randomNumbers.data(), GL_STATIC_DRAW);
     int* bufferData = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
-    //fill the output buffer with the same random numbers
+
+    //fill the order buffer with ascending numbers
+    //generate ascending numbers
+    std::vector<int> ascendingNumbers(randomNumbers.size());
+    for(int i = 0; i < randomNumbers.size(); i++) {
+        ascendingNumbers[i] = i;
+    }
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, orderBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, ascendingNumbers.size() * sizeof(int), ascendingNumbers.data(), GL_STATIC_DRAW);
+    //fill the output buffer with the same ascending numbers
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, randomNumbers.size() * sizeof(int), randomNumbers.data(), GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, ascendingNumbers.size() * sizeof(int), ascendingNumbers.data(), GL_STATIC_DRAW);
+
     //int* outputBufferData = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
     //run program
-    GPURadixSort(buffer, outputBuffer, randomNumbers.size());
+    //GPURadixSort(buffer, outputBuffer, randomNumbers.size());
+    GPURadixSort2(buffer, outputBuffer, orderBuffer, randomNumbers.size());
+    //deep copy random numbers
+    std::vector<double> randomNumbersCopy(randomNumbers);
+
     //sort random numbers on cpu
     double currentTime = glfwGetTime();
     std::sort(randomNumbers.begin(), randomNumbers.end());
@@ -185,12 +204,13 @@ TEST(SortTest, SortTest) {
     try{
         int errors = 0;
         //get buffer data
-        for (int i = 0; i < randomNumbers.size(); i++) {
-            //ASSERT_GE(outputBufferVector[i], outputBufferVector[i - 1]);
-            if(outputBufferVector[i] < outputBufferVector[i - 1]) {
+        for (int i = 1; i < randomNumbers.size(); i++) {
+            ASSERT_GE(randomNumbersCopy[outputBufferVector[i]], randomNumbersCopy[outputBufferVector[i - 1]]);
+            if(randomNumbersCopy[outputBufferVector[i]] < randomNumbersCopy[outputBufferVector[i - 1]]) {
+                std::cout << i << std::endl;
                 errors++;
             }
-            //ASSERT_EQ(outputBufferVector[i], randomNumbers[i]);
+            ASSERT_EQ(randomNumbersCopy[outputBufferVector[i]], randomNumbers[i]);
 
         }
         std::cout << "number of errors: " << errors << std::endl;
