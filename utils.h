@@ -51,14 +51,14 @@ std::vector<float> createRandomNumbersFloat(int size) {
     }
     return randomNumbers;
 }
-std::vector<int> createRandomNumbersInt(int size, int maxNumber) {
+std::vector<uint64_t> createRandomNumbersInt(int size, uint64_t maxNumber) {
     if(size < 1) {
         std::cerr << "Error: size must be greater than 0" << std::endl;
-        return std::vector<int>();
+        return std::vector<uint64_t>();
     }
-    std::vector<int> randomNumbers(size);
+    std::vector<uint64_t> randomNumbers(size);
     for (int i = 0; i < size; i++) {
-        randomNumbers[i] = rand() % maxNumber;
+        randomNumbers[i] = static_cast<uint64_t>(rand() / 10000000.f * maxNumber);
     }
     return randomNumbers;
 }

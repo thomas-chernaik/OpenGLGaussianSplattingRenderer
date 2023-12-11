@@ -153,7 +153,7 @@ void GPURadixSort2(GLuint buffer, GLuint outputBuffer, GLuint orderBuffer, int s
     int sectionSize = size / numberOfSections;
 
     //create the histogram buffer to use later
-    int histogramSize = 32 * numberOfSections;
+    int histogramSize = 16 * numberOfSections;
     GLuint histogramBuffer;
     glGenBuffers(1, &histogramBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);

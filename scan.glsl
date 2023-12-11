@@ -1,11 +1,12 @@
 #version 430 core
-
+#extension GL_ARB_gpu_shader_int64 : require
 //the size of the work group
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
+
 //the input buffer of keys to be sorted
 layout (binding = 0)  buffer InputBuffer {
-    double data[];
+    uint64_t data[];
 } inputBuffer;
 //the output buffer of sorted keys
 layout (binding = 1) buffer OutputBuffer {
@@ -35,7 +36,7 @@ void main() {
     //the start index of the section
     int startIdx = int(gl_GlobalInvocationID.x) * sectionSize;
     //the mask to extract the bits we are sorting on
-    int mask = 0x0000000F << (segment * 4);
+    uint64_t mask = 0xF << (segment * 4);
 
     //now we need to work out where each key will go in the output buffer
     //we use two values
@@ -76,7 +77,7 @@ void main() {
     {
         for(int j = 0; j < outputSize; j++)
         {
-            int index = (int(inputBuffer.data[orderBuffer.data[i+j]]) & mask) >> (segment * 4);
+            int index = int((inputBuffer.data[orderBuffer.data[i+j]] & mask) >> (segment * 4));
             int sortedIdx = globalPrefixSum[index] + offsets[index];
             //int dataToWrite = orderBuffer.data[i+j];
             //outputBuffer.data[sortedIdx] = dataToWrite;
