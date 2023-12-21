@@ -1,9 +1,8 @@
 #include <iostream>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include "utils.h"
 #include "sort.h"
-#include <cmath>
+#include "Splats.h"
 int main()
 {
     //intialise glfw
@@ -32,27 +31,19 @@ int main()
         glfwTerminate();
         return -1;
     }
-    std::cout << "compiling shaders" << std::endl;
-    createAndLinkSortShader();
-
-    //create buffer
-    GLuint buffer;
-    glGenBuffers(1, &buffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
-
-    //create output buffer
-    GLuint outputBuffer;
-    glGenBuffers(1, &outputBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputBuffer);
-
-    //create random numbers
-    std::vector<float> randomNumbers = createRandomNumbersFloat(256*16);
-    //fill the input buffer with random numbers
-    glBufferData(GL_SHADER_STORAGE_BUFFER, randomNumbers.size() * sizeof(float), randomNumbers.data(), GL_STATIC_DRAW);
-    //fill the output buffer with the same random numbers
-    glBufferData(GL_SHADER_STORAGE_BUFFER, randomNumbers.size() * sizeof(float), randomNumbers.data(), GL_STATIC_DRAW);
-    //run program
-    GPURadixSort(buffer, randomNumbers.size());
+    Splats splats("models/point_cloud.ply");
+    //load splats into buffers
+    splats.loadToGPU();
+    //load shaders
+    splats.loadShaders();
+    //preprocess splats
+    splats.preprocess();
+    //generate keys
+    splats.generateKeys();
+    //sort splats
+    splats.sort();
+    //draw splats
+    splats.draw(nullptr, nullptr, nullptr, nullptr, nullptr);
 
 
 

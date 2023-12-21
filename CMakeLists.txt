@@ -8,14 +8,18 @@ find_package(GLEW REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(GTest REQUIRED)
 
+# Add the include directories for the libraries
+include_directories("include")
+
 # Add the source files to the project
 add_executable(diss main.cpp
-        utils.h
-        sort.h)
+        include/utils.h
+        include/sort.h
+        src/Splats.cpp)
 
 add_executable(tests tests/sortTests.cpp
-        utils.h
-        sort.h)
+        include/utils.h
+        include/sort.h)
 
 # Include directories for GLEW and GLFW
 target_include_directories(diss PRIVATE ${GLEW_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})

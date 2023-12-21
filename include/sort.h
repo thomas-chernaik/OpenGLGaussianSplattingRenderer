@@ -10,17 +10,13 @@
 
 #ifndef DISS_SORT_H
 #define DISS_SORT_H
-GLuint program;
-
-GLuint histogramProgram;
-GLuint sortProgram;
 
 //function to create and link the shaders we will use later
-void createAndLinkSortAndHistogramShaders()
+void createAndLinkSortAndHistogramShaders(GLuint &histogramProgram, GLuint &sortProgram)
 {
     std::cout << "compiling sorting shaders" << std::endl;
     //read shader file for histogram
-    std::string histogramShaderCode = readShaderFile("generateHistograms.glsl");
+    std::string histogramShaderCode = readShaderFile("shaders/generateHistograms.glsl");
 
     //create histogram shader
     GLuint histogramShader = glCreateShader(GL_COMPUTE_SHADER);
@@ -55,7 +51,7 @@ void createAndLinkSortAndHistogramShaders()
     }
 
     //read shader file for sort
-    std::string sortShaderCode = readShaderFile("scan.glsl");
+    std::string sortShaderCode = readShaderFile("shaders/scan.glsl");
 
     //create sort shader
     GLuint sortShader = glCreateShader(GL_COMPUTE_SHADER);
@@ -92,7 +88,7 @@ void createAndLinkSortAndHistogramShaders()
 
 
 //function to create and link the shader we will use later
-void createAndLinkSortShader()
+void createAndLinkSortShader(GLuint &program)
 {
     std::cout << "compiling sorting shader" << std::endl;
     //read shader file
@@ -132,38 +128,21 @@ void createAndLinkSortShader()
     std::cout << "compiled and linked sorting shader" << std::endl;
 }
 
-void GPURadixSort2(GLuint buffer, GLuint outputBuffer, GLuint orderBuffer, int size)
+void GPURadixSort2(GLuint histogramProgram, GLuint sortProgram, GLuint buffer, GLuint outputBuffer, GLuint orderBuffer, GLuint histogramBuffer, int size, int workGroupCount, int workGroupSize)
 {
     //create query object
     GLuint startTimeQuery, endTimeQuery;
     glGenQueries(1, &startTimeQuery);
     glGenQueries(1, &endTimeQuery);
     GLint64 startTime, endTime;
-
-    //measure GPU time
-
-
-
-
-    //get number of work groups
-    int workGroupCount = 4;
-    //work out the section size and number of sections
-    int workGroupSize = 256;
     int numberOfSections = workGroupCount * workGroupSize;
     int sectionSize = size / numberOfSections;
-
-    //create the histogram buffer to use later
-    int histogramSize = 16 * numberOfSections;
-    GLuint histogramBuffer;
-    glGenBuffers(1, &histogramBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, histogramSize * sizeof(int), nullptr, GL_STATIC_DRAW);
 
     //start the timer
     glQueryCounter(startTimeQuery, GL_TIMESTAMP);
 
     //run the sort
-    for(int i=0; i<16; i++)
+    for(int i=0; i<8; i++)
     {
         //generate the histograms
         glUseProgram(histogramProgram);
@@ -193,7 +172,6 @@ void GPURadixSort2(GLuint buffer, GLuint outputBuffer, GLuint orderBuffer, int s
         GLuint temp = orderBuffer;
         orderBuffer = outputBuffer;
         outputBuffer = temp;
-
     }
     //outputBuffer;
     //stop the timer
@@ -207,7 +185,7 @@ void GPURadixSort2(GLuint buffer, GLuint outputBuffer, GLuint orderBuffer, int s
     std::cout << "GPU sort took " << timeTaken << " seconds" << std::endl;
 }
 
-void GPURadixSort(GLuint buffer, GLuint outputBuffer, int size)
+void GPURadixSort(GLuint program, GLuint buffer, GLuint outputBuffer, int size)
 {
     //create query object
     GLuint startTimeQuery, endTimeQuery;

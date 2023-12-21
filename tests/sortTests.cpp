@@ -5,8 +5,8 @@
 #include <GLFW/glfw3.h>
 #include <gtest/gtest.h>
 #include <stdexcept>
-#include "../utils.h"
-#include "../sort.h"
+#include "utils.h"
+#include "sort.h"
 
 //c++ implementation of the shader for debugging
 void radixSort()
@@ -150,8 +150,9 @@ TEST(SortTest, SortTest) {
     }
 
     std::cout << "compiling shaders" << std::endl;
-    createAndLinkSortShader();
-    createAndLinkSortAndHistogramShaders();
+    //createAndLinkSortShader();
+    GLuint histogramProgram, sortProgram;
+    createAndLinkSortAndHistogramShaders(histogramProgram, sortProgram);
     std::cout << "compiled shaders" << std::endl;
 
     //create buffer
@@ -168,7 +169,7 @@ TEST(SortTest, SortTest) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, orderBuffer);
     //create random numbers
 
-    std::vector<uint64_t> randomNumbers = createRandomNumbersInt(256*16*32, pow(2, 24));
+    std::vector<uint64_t> randomNumbers = createRandomNumbersInt(256*16*512, pow(2, 32));
     //print the max number
     std::cout << "max number: " << *std::max_element(randomNumbers.begin(), randomNumbers.end()) << std::endl;
     //fill the input buffer with random numbers
@@ -188,10 +189,22 @@ TEST(SortTest, SortTest) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, ascendingNumbers.size() * sizeof(int), ascendingNumbers.data(), GL_STATIC_DRAW);
 
+
+    //create the histogram buffer to use later
+    int histogramSize = 16 * 8*256;
+    GLuint histogramBuffer;
+    glGenBuffers(1, &histogramBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, histogramSize * sizeof(int), nullptr, GL_STATIC_DRAW);
+
+
+
     //int* outputBufferData = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
     //run program
     //GPURadixSort(buffer, outputBuffer, randomNumbers.size());
-    GPURadixSort2(buffer, outputBuffer, orderBuffer, randomNumbers.size());
+
+
+    GPURadixSort2(histogramProgram, sortProgram, buffer, outputBuffer, orderBuffer, histogramBuffer, randomNumbers.size(), 8, 256);
     //deep copy random numbers
     std::vector<uint64_t> randomNumbersCopy(randomNumbers);
 
@@ -199,7 +212,7 @@ TEST(SortTest, SortTest) {
     double currentTime = glfwGetTime();
     std::sort(randomNumbers.begin(), randomNumbers.end());
     std::cout << "CPU sort took " << glfwGetTime() - currentTime << " seconds" << std::endl;
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, orderBuffer);
     int* outputBufferData = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
     //copy buffer data to vector
     std::vector<int> outputBufferVector(outputBufferData, outputBufferData + randomNumbers.size());
@@ -208,12 +221,12 @@ TEST(SortTest, SortTest) {
         int errors = 0;
         //get buffer data
         for (int i = 1; i < randomNumbers.size(); i++) {
-            //ASSERT_GE(randomNumbersCopy[outputBufferVector[i]], randomNumbersCopy[outputBufferVector[i - 1]]);
+            ASSERT_GE(randomNumbersCopy[outputBufferVector[i]], randomNumbersCopy[outputBufferVector[i - 1]]);
             if(randomNumbersCopy[outputBufferVector[i]] < randomNumbersCopy[outputBufferVector[i - 1]]) {
                 //std::cout << i << std::endl;
                 errors++;
             }
-            //ASSERT_EQ(randomNumbersCopy[outputBufferVector[i]], randomNumbers[i]);
+            ASSERT_EQ(randomNumbersCopy[outputBufferVector[i]], randomNumbers[i]);
 
         }
         std::cout << "number of errors: " << errors << std::endl;

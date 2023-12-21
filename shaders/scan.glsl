@@ -36,7 +36,7 @@ void main() {
     //the start index of the section
     int startIdx = int(gl_GlobalInvocationID.x) * sectionSize;
     //the mask to extract the bits we are sorting on
-    uint64_t mask = 0xF << (segment * 4);
+    uint64_t mask = 0x000000000000000F << (segment * 4);
 
     //now we need to work out where each key will go in the output buffer
     //we use two values
