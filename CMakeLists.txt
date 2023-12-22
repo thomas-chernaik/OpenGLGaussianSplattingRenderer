@@ -15,11 +15,16 @@ include_directories("include")
 add_executable(diss main.cpp
         include/utils.h
         include/sort.h
-        src/Splats.cpp)
+        include/Splats.h
+        src/Splats.cpp
+        src/sort.cpp
+        src/utils.cpp)
 
 add_executable(tests tests/sortTests.cpp
         include/utils.h
-        include/sort.h)
+        include/sort.h
+        src/sort.cpp
+        src/utils.cpp)
 
 # Include directories for GLEW and GLFW
 target_include_directories(diss PRIVATE ${GLEW_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})

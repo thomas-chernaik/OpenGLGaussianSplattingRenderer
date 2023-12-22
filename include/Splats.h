@@ -2,6 +2,7 @@
 // Created by thomas on 11/12/23.
 //
 #include <GL/glew.h>
+#include <glm/glm.hpp>
 #include <stdlib.h>
 #include <string>
 #include <vector>
@@ -10,8 +11,10 @@
 #include <sstream>
 #include <cmath>
 #include <algorithm>
+#include <array>
 
 #include "sort.h"
+#include "utils.h"
 
 
 
@@ -37,7 +40,7 @@ class Splats
         void preprocess();
 
         //function to generate tile and depth based keys of splats
-        void generateKeys();
+        void countTileSizes();
 
         //function to sort the splats
         void sort();
@@ -51,18 +54,20 @@ class Splats
         //function to load splats from file
         void loadSplats(const std::string& filePath);
 
-        //function to calculate if a splat is culled
-        bool isCulled(int index, float* viewMatrix, float* projectionMatrix);
+        //function to compute the 3D covariance matrix
+        void computeCovarianceMatrices();
+        glm::mat3x3 computeCovarianceMatrix(const glm::vec3 scale, const glm::vec4 rotation);
+
 
         int numSplats;
         int numSplatsPostCull;
-        std::vector<float> means3D;
-        std::vector<float> colours;
+        std::vector<glm::vec3> means3D;
+        std::vector<glm::vec3> colours;
         std::vector<float> sphericalHarmonics;
         std::vector<float> opacities;
-        std::vector<float> scales;
-        float scaleModifier;
-        std::vector<float> rotations;
+        std::vector<glm::vec3> scales;
+        std::vector<glm::vec4> rotations;
+        std::vector<std::array<float, 6>> covarianceMatrices;
 
         int workGroupSize;
         int numWorkGroups;
@@ -73,8 +78,9 @@ class Splats
         GLuint means3DBuffer;
         GLuint coloursBuffer;
         GLuint opacitiesBuffer;
-        GLuint scalesBuffer;
-        GLuint rotationsBuffer;
+        GLuint CovarianceBuffer;
+        GLuint projectedMeansBuffer;
+        GLuint projectedCovarianceBuffer;
         GLuint indexBuffer;
         GLuint keyBuffer;
         GLuint intermediateBuffer;

@@ -1,7 +1,6 @@
-#include <iostream>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include "sort.h"
+#include <iostream>
 #include "Splats.h"
 int main()
 {
@@ -32,21 +31,22 @@ int main()
         return -1;
     }
     Splats splats("models/point_cloud.ply");
-    //load splats into buffers
-    splats.loadToGPU();
-    //load shaders
-    splats.loadShaders();
+
+    //render image
     //preprocess splats
+    std::cout << "Preprocessing splats" << std::endl;
     splats.preprocess();
-    //generate keys
-    splats.generateKeys();
     //sort splats
+    std::cout << "Sorting splats" << std::endl;
     splats.sort();
+    //count tile sizes
+    std::cout << "Counting tile sizes" << std::endl;
+    splats.countTileSizes();
     //draw splats
+    std::cout << "Drawing splats" << std::endl;
     splats.draw(nullptr, nullptr, nullptr, nullptr, nullptr);
 
-
-
-
+    //close window
+    glfwTerminate();
     return 0;
 }

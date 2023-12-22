@@ -6,43 +6,72 @@
 
 Splats::Splats(const std::string &filePath)
 {
+    std::cout << "setting up splats" << std::endl;
     loadSplats(filePath);
+    computeCovarianceMatrices();
+    loadToGPU();
+    loadShaders();
+    std::cout << "finished setting up splats" << std::endl;
 }
 
 Splats::~Splats()
 {
-
+    //delete the buffers
+    glDeleteBuffers(1, &means3DBuffer);
+    glDeleteBuffers(1, &coloursBuffer);
+    glDeleteBuffers(1, &sphericalHarmonicsBuffer);
+    glDeleteBuffers(1, &opacitiesBuffer);
+    glDeleteBuffers(1, &indexBuffer);
+    glDeleteBuffers(1, &keyBuffer);
+    //delete the shaders
+    glDeleteProgram(preProcessProgram);
+    glDeleteProgram(generateKeysProgram);
+    glDeleteProgram(sortProgram);
+    glDeleteProgram(histogramProgram);
+    glDeleteProgram(drawProgram);
 }
 
 void Splats::loadToGPU()
 {
+    std::cout << "Loading splats to GPU" << std::endl;
     //create the buffers
     glGenBuffers(1, &means3DBuffer);
     glGenBuffers(1, &coloursBuffer);
     glGenBuffers(1, &sphericalHarmonicsBuffer);
     glGenBuffers(1, &opacitiesBuffer);
-    glGenBuffers(1, &scalesBuffer);
-    glGenBuffers(1, &rotationsBuffer);
     glGenBuffers(1, &indexBuffer);
     glGenBuffers(1, &keyBuffer);
-    //bind the buffers
+    glGenBuffers(1, &intermediateBuffer);
+    glGenBuffers(1, &histogramBuffer);
+    glGenBuffers(1, &CovarianceBuffer);
+    glGenBuffers(1, &projectedMeansBuffer);
+    glGenBuffers(1, &projectedCovarianceBuffer);
+    //bind the buffers and load the data
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, means3DBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, means3D.size() * sizeof(glm::vec3), means3D.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, coloursBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, colours.size() * sizeof(glm::vec3), colours.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, sphericalHarmonicsBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sphericalHarmonics.size() * sizeof(float), sphericalHarmonics.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, opacitiesBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, scalesBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, rotationsBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, opacities.size() * sizeof(float), opacities.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, indexBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * sizeof(int), nullptr, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, keyBuffer);
-    //load the data into the buffers
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float) * means3D.size(), means3D.data(), GL_STATIC_DRAW);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float) * colours.size(), colours.data(), GL_STATIC_DRAW);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float) * sphericalHarmonics.size(), sphericalHarmonics.data(), GL_STATIC_DRAW);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float) * opacities.size(), opacities.data(), GL_STATIC_DRAW);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float) * scales.size(), scales.data(), GL_STATIC_DRAW);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float) * rotations.size(), rotations.data(), GL_STATIC_DRAW);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(int) * numSplats, nullptr, GL_STATIC_DRAW);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(int) * numSplats, nullptr, GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * sizeof(int), nullptr, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, intermediateBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * sizeof(int), nullptr, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * sizeof(int), nullptr, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, CovarianceBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 9 * sizeof(float), nullptr, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedMeansBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * sizeof(float), nullptr, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedCovarianceBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 3 * sizeof(float), nullptr, GL_STATIC_DRAW);
+
+    std::cout << "Finished loading splats to GPU" << std::endl;
+
 }
 
 void Splats::loadShaders()
@@ -50,11 +79,16 @@ void Splats::loadShaders()
     //load the sort and histogram shaders
     createAndLinkSortAndHistogramShaders(histogramProgram, sortProgram);
     //load the preprocess shader
-    preProcessProgram = createShaderProgram("shaders/preprocess");
+    preProcessProgram = loadAndLinkShader("preprocess");
+    //load the generate keys shader
+    generateKeysProgram = loadAndLinkShader("countTileSizes");
+    //load the draw shader
+    drawProgram = loadAndLinkShader("draw");
 }
 
 void Splats::loadSplats(const std::string &filePath)
 {
+    std::cout << "Loading splats from file" << std::endl;
     //the file is stored in ply format
     //the number of splats is in the 3rd line after element vertex
     //the data is stored as follows
@@ -157,9 +191,8 @@ void Splats::loadSplats(const std::string &filePath)
         //read the mean
         float mean[3];
         file.read((char *) mean, sizeof(float) * 3);
-        means3D.push_back(mean[0]);
-        means3D.push_back(mean[1]);
-        means3D.push_back(mean[2]);
+        glm::vec3 meanVec(mean[0], mean[1], mean[2]);
+        means3D.push_back(meanVec);
         //read out the normal
         float normal[3];
         file.read((char *) normal, sizeof(float) * 3);
@@ -176,9 +209,8 @@ void Splats::loadSplats(const std::string &filePath)
             colour[i] = (0.5 + (SH_C0 * colour[i])) * 255.f;
             //colour[i] = exp(colour[i]);
         }
-        colours.push_back(colour[0]);
-        colours.push_back(colour[1]);
-        colours.push_back(colour[2]);
+        glm::vec3 colourVec(colour[0], colour[1], colour[2]);
+        colours.push_back(colourVec);
         //read the spherical harmonics (44 floats)
         float sphericalHarmonic[45];
         file.read((char *) sphericalHarmonic, sizeof(float) * 45);
@@ -200,40 +232,15 @@ void Splats::loadSplats(const std::string &filePath)
         //read the scale
         float scale[3];
         file.read((char *) scale, sizeof(float) * 3);
-        scales.push_back(scale[0]);
-        scales.push_back(scale[1]);
-        scales.push_back(scale[2]);
+        glm::vec3 scaleVec(scale[0], scale[1], scale[2]);
+        scales.push_back(scaleVec);
         //read the rotation
         float rotation[4];
         file.read((char *) rotation, sizeof(float) * 4);
-        rotations.push_back(rotation[0]);
-        rotations.push_back(rotation[1]);
-        rotations.push_back(rotation[2]);
-        rotations.push_back(rotation[3]);
+        glm::vec4 rotationVec(rotation[0], rotation[1], rotation[2], rotation[3]);
+        rotations.push_back(rotationVec);
 
     }
-    //print the range of the opacities
-    std::cout << "opacity range: " << *std::min_element(opacities.begin(), opacities.end()) << " - " << *std::max_element(opacities.begin(), opacities.end()) << std::endl;
-    //print the number of splats with opacity less than 1
-    std::cout << "num splats with opacity less than 1: " << count << std::endl;
-    //print the range of the colours
-    std::cout << "colour range: " << *std::min_element(colours.begin(), colours.end()) << " - " << *std::max_element(colours.begin(), colours.end()) << std::endl;
-    //print the number of colours outside 0-255
-    int count2 = 0;
-    for(int i = 0; i < colours.size(); i++)
-    {
-        if(colours[i] < 0 || colours[i] > 255)
-        {
-            count2++;
-        }
-    }
-    std::cout << "num colours outside 0-255: " << count2 << std::endl;
-    //print the range of the rotations
-    std::cout << "rotation range: " << *std::min_element(rotations.begin(), rotations.end()) << " - " << *std::max_element(rotations.begin(), rotations.end()) << std::endl;
-    //print the range of the scales
-    std::cout << "scale range: " << *std::min_element(scales.begin(), scales.end()) << " - " << *std::max_element(scales.begin(), scales.end()) << std::endl;
-    //print the range of the means
-    std::cout << "mean range: " << *std::min_element(means3D.begin(), means3D.end()) << " - " << *std::max_element(means3D.begin(), means3D.end()) << std::endl;
     char c;
     file.read(&c, sizeof(char));
     //check we have reached the end of the file
@@ -244,4 +251,71 @@ void Splats::loadSplats(const std::string &filePath)
     }
     //close the file
     file.close();
+    std::cout << "Finished loading splats from file" << std::endl;
+}
+
+void Splats::preprocess()
+{
+    /*the shader needs the following inputs
+     * the buffer of means
+     * the buffer of opacities
+     * the buffer of precomputed 3D covariance matrices
+     * the transform matrix (view matrix * projection matrix)
+     *
+     *
+     * and needs buffers for the following outputs
+     * the buffer of tiles touched & depths (keys)
+     * the buffer of conic opacities (related to the 2D covariance matrices)
+     * the buffer of the projected means
+     */
+    //culled splats will be given a key of a very large number.
+}
+
+void Splats::countTileSizes()
+{}
+
+void Splats::sort()
+{}
+
+void Splats::draw(float *viewMatrix, float *projectionMatrix, float *lightPosition, float *lightColour, float *cameraPosition)
+{}
+
+void Splats::computeCovarianceMatrices()
+{
+    std::cout << "Computing covariance matrices" << std::endl;
+    //compute the 3D covariance matrix for each splat
+    for(int i = 0; i < numSplats; i++)
+    {
+        //get the scale and rotation of the splat
+        glm::vec3 scale = scales[i];
+        glm::vec4 rotation = rotations[i];
+        //compute the 3D covariance matrix
+        glm::mat3x3 covariance = computeCovarianceMatrix(scale, rotation);
+        //store only the upper triangular part of the matrix, as it is symmetric
+        covarianceMatrices.push_back({covariance[0][0], covariance[0][1], covariance[0][2], covariance[1][1], covariance[1][2],
+                               covariance[2][2]});
+    }
+    std::cout << "Finished computing covariance matrices" << std::endl;
+}
+
+glm::mat3x3 Splats::computeCovarianceMatrix(const glm::vec3 scale, const glm::vec4 rotation)
+{
+    //create the scale matrix
+    glm::mat3x3 scaleMatrix = glm::mat3x3(scale[0], 0, 0, 0, scale[1], 0, 0, 0, scale[2]);
+
+    //normalise the rotation quaternion
+    float length = rotation.length();
+    glm::vec4 normalisedRotation = glm::vec4(rotation[0] / length, rotation[1] / length, rotation[2] / length, rotation[3] / length);
+    //create the rotation matrix
+    //https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
+    glm::mat3x3 rotationMatrix = glm::mat3x3( 1-2*(normalisedRotation[1]*normalisedRotation[1] + normalisedRotation[2]*normalisedRotation[2]), 2*(normalisedRotation[0]*normalisedRotation[1] - normalisedRotation[2]*normalisedRotation[3]), 2*(normalisedRotation[0]*normalisedRotation[2] + normalisedRotation[1]*normalisedRotation[3]),
+                                              2*(normalisedRotation[0]*normalisedRotation[1] + normalisedRotation[2]*normalisedRotation[3]), 1-2*(normalisedRotation[0]*normalisedRotation[0] + normalisedRotation[2]*normalisedRotation[2]), 2*(normalisedRotation[1]*normalisedRotation[2] - normalisedRotation[0]*normalisedRotation[3]),
+                                              2*(normalisedRotation[0]*normalisedRotation[2] - normalisedRotation[1]*normalisedRotation[3]), 2*(normalisedRotation[1]*normalisedRotation[2] + normalisedRotation[0]*normalisedRotation[3]), 1-2*(normalisedRotation[0]*normalisedRotation[0] + normalisedRotation[1]*normalisedRotation[1]));
+    //compute the 3D covariance matrix from the transformation matrix
+    //https://users.cs.utah.edu/~tch/CS4640F2019/resources/A%20geometric%20interpretation%20of%20the%20covariance%20matrix.pdf
+    // sigma = T * T^T
+    glm::mat3x3 transformationMatrix = rotationMatrix * scaleMatrix;
+    glm::mat3x3 covarianceMatrix = transformationMatrix * glm::transpose(transformationMatrix);
+    return covarianceMatrix;
+
 }
