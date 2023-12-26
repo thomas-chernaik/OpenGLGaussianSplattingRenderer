@@ -6,11 +6,11 @@
 
 Splats::Splats(const std::string &filePath)
 {
+    loadShaders();
     std::cout << "setting up splats" << std::endl;
     loadSplats(filePath);
     computeCovarianceMatrices();
     loadToGPU();
-    loadShaders();
     std::cout << "finished setting up splats" << std::endl;
 }
 
@@ -64,7 +64,7 @@ void Splats::loadToGPU()
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * sizeof(int), nullptr, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, CovarianceBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 9 * sizeof(float), nullptr, GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 6 * sizeof(float), covarianceMatrices.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedMeansBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * sizeof(float), nullptr, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedCovarianceBuffer);

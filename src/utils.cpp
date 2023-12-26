@@ -117,7 +117,10 @@ GLuint loadAndLinkShader(std::string shaderName)
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (!success)
     {
-        std::cerr << "Failed to link program" << std::endl;
+        // Linking failed, print error log
+        char infoLog[512];
+        glGetProgramInfoLog(program, 512, nullptr, infoLog);
+        std::cout << "Shader linking failed:\n" << infoLog << std::endl;
         glfwTerminate();
         return -1;
     }
