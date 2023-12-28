@@ -1,23 +1,22 @@
 #version 430 core
-#extension GL_ARB_gpu_shader_int64 : require
 //the size of the work group
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 
 //the input buffer of keys to be sorted
-layout (binding = 0)  buffer InputBuffer {
-    uint64_t data[];
+layout (std430, binding = 0)  buffer InputBuffer {
+    int data[];
 } inputBuffer;
 //the output buffer of sorted keys
-layout (binding = 1) buffer OutputBuffer {
+layout (std430, binding = 1) buffer OutputBuffer {
     int data[];
 } outputBuffer;
 //the output buffer for the order of the keys
-layout (binding = 3) buffer OrderBuffer {
+layout (std430, binding = 3) buffer OrderBuffer {
     int data[];
 } orderBuffer;
 //the global histograms, size keySize * numSections
-layout (binding = 2) buffer GlobalHistograms {
+layout (std430, binding = 2) buffer GlobalHistograms {
     int data[];
 } globalHistogramsBuffer;
 
@@ -36,7 +35,7 @@ void main() {
     //the start index of the section
     int startIdx = int(gl_GlobalInvocationID.x) * sectionSize;
     //the mask to extract the bits we are sorting on
-    uint64_t mask = 0x000000000000000F << (segment * 4);
+    uint mask = 0x000000000000000F << (segment * 4);
 
     //now we need to work out where each key will go in the output buffer
     //we use two values

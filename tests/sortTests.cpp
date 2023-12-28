@@ -9,13 +9,14 @@
 #include "sort.h"
 
 //c++ implementation of the shader for debugging
+/*
 void radixSort()
 {
     int sizeOfBuffer = pow(2,30);
     int numThreads = 256;
     //initialise two "buffers" (vectors) of random numbers
-    std::vector<uint64_t> buffer = createRandomNumbersInt(sizeOfBuffer, 500000);
-    std::vector<uint64_t> outputBuffer = createRandomNumbersInt(sizeOfBuffer, 16);
+    std::vector<int> buffer = createRandomNumbersInt(sizeOfBuffer, 500000);
+    std::vector<int> outputBuffer = createRandomNumbersInt(sizeOfBuffer, 16);
     //initialise the "global memory" (vector) for the local work group
     std::vector<int> globalHistograms(numThreads * 16);
 
@@ -112,7 +113,7 @@ void radixSort()
         std::cerr << "Error: buffer is not sorted" << std::endl;
         return;
     }
-}
+}*/
 
 //create tests for the sort function
 TEST(SortTest, SortTest) {
@@ -169,12 +170,12 @@ TEST(SortTest, SortTest) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, orderBuffer);
     //create random numbers
 
-    std::vector<uint64_t> randomNumbers = createRandomNumbersInt(256*16*512, pow(2, 32));
+    std::vector<int> randomNumbers = createRandomNumbersInt(256*16*512, pow(2, 32));
     //print the max number
     std::cout << "max number: " << *std::max_element(randomNumbers.begin(), randomNumbers.end()) << std::endl;
     //fill the input buffer with random numbers
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, randomNumbers.size() * sizeof(uint64_t), randomNumbers.data(), GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, randomNumbers.size() * sizeof(int), randomNumbers.data(), GL_STATIC_DRAW);
     int* bufferData = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
 
     //fill the order buffer with ascending numbers
@@ -206,7 +207,7 @@ TEST(SortTest, SortTest) {
 
     GPURadixSort2(histogramProgram, sortProgram, buffer, outputBuffer, orderBuffer, histogramBuffer, randomNumbers.size(), 8, 256);
     //deep copy random numbers
-    std::vector<uint64_t> randomNumbersCopy(randomNumbers);
+    std::vector<int> randomNumbersCopy(randomNumbers);
 
     //sort random numbers on cpu
     double currentTime = glfwGetTime();

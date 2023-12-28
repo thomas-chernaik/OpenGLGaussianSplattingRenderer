@@ -16,11 +16,12 @@ add_executable(diss main.cpp
         include/utils.h
         include/sort.h
         include/Splats.h
+        include/Camera.h
         src/Splats.cpp
         src/sort.cpp
         src/utils.cpp
-        Camera.cpp
-        Camera.h)
+        src/Camera.cpp
+        )
 
 add_executable(tests tests/sortTests.cpp
         include/utils.h

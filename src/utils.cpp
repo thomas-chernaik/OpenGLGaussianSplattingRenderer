@@ -56,11 +56,11 @@ std::vector<float> createRandomNumbersFloat(int size) {
     }
     return randomNumbers;
 }
-std::vector<uint64_t> createRandomNumbersInt(int size, uint64_t maxNumber) {
-    std::vector<uint64_t> randomNumbers(size);
+std::vector<int> createRandomNumbersInt(int size, int maxNumber) {
+    std::vector<int> randomNumbers(size);
     std::random_device rd;
     std::mt19937 gen = std::mt19937 (rd());
-    std::uniform_int_distribution<uint64_t> dis(0, maxNumber - 1);
+    std::uniform_int_distribution<int> dis(0, maxNumber - 1);
 
     std::generate(randomNumbers.begin(), randomNumbers.end(), [&]() {
         return dis(gen);

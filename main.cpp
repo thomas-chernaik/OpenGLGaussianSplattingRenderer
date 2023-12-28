@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include "Splats.h"
+#include "Camera.h"
 int main()
 {
     //intialise glfw
@@ -30,18 +31,40 @@ int main()
         glfwTerminate();
         return -1;
     }
+    //initialise timer stuff
+    GLuint timerQuery;
+    glGenQueries(1, &timerQuery);
+
+
+    //initialise camera
+    Camera camera(0.0f, 0.0f, 3.0f);
+    camera.update();
+
     Splats splats("models/point_cloud.ply");
 
     //render image
     //preprocess splats
     std::cout << "Preprocessing splats" << std::endl;
-    splats.preprocess(glm::mat4(), glm::mat3(), 0, 0);
+
+    splats.preprocess(camera.getViewMatrix() * camera.getProjectionMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
+
+    //duplicate splats
+    //start timer query
+    glBeginQuery(GL_TIME_ELAPSED, timerQuery);
+
+    std::cout << "Duplicating splats, generating keys" << std::endl;
+    splats.duplicateKeys();
+    //end timer query
+    glEndQuery(GL_TIME_ELAPSED);
+    //get time
+    GLuint64 timeElapsed;
+    glGetQueryObjectui64v(timerQuery, GL_QUERY_RESULT, &timeElapsed);
+    std::cout << "Duplicating splats took " << timeElapsed / 1000000.0 << " milliseconds" << std::endl;
+
     //sort splats
     std::cout << "Sorting splats" << std::endl;
     splats.sort();
-    //count tile sizes
-    std::cout << "Counting tile sizes" << std::endl;
-    splats.countTileSizes();
+
     //draw splats
     std::cout << "Drawing splats" << std::endl;
     splats.draw(nullptr, nullptr, nullptr, nullptr, nullptr);

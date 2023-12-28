@@ -128,7 +128,7 @@ void main() {
     minY /= heightDiv16;
     maxY /= heightDiv16;
     int numOverlappingTiles = 0;
-    int keysToWrite = 0;
+    uint keysToWrite = 0;
     for(int x=minX; x<=maxX; x++) {
         for (int y=minY; y<=maxY; y++) {
             //if we've already found 8 overlapping tiles, return
@@ -137,7 +137,7 @@ void main() {
                 return;
             }
             //calculate the index of the tile
-            int tileIndex = x + y * 16;
+            uint tileIndex = x + y * 16;
             //set the key to the 4*numOverlappingTiles to the tile index
             keysToWrite &= (tileIndex << (4 * numOverlappingTiles));
             //increment the number of overlapping tiles
@@ -150,8 +150,9 @@ void main() {
         keys.data[index] = vec2(allOnes, allOnes);
         return;
     }
+    float keysFloatEncoding = uintBitsToFloat(keysToWrite);
     //set the values
-    keys.data[index] = vec2(keysToWrite, depth);
+    keys.data[index] = vec2(keysFloatEncoding, depth);
     conicOpacities.data[index] = vec4(conic, opacity);
     projectedMeans.data[index] = projectedMeanPixelSpace;
 

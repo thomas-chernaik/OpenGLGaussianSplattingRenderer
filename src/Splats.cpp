@@ -55,14 +55,6 @@ void Splats::loadToGPU()
     glBufferData(GL_SHADER_STORAGE_BUFFER, sphericalHarmonics.size() * sizeof(float), sphericalHarmonics.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, opacitiesBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, opacities.size() * sizeof(float), opacities.data(), GL_STATIC_DRAW);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, indexBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * sizeof(int), nullptr, GL_STATIC_DRAW);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, keyBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * sizeof(int), nullptr, GL_STATIC_DRAW);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, intermediateBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * sizeof(int), nullptr, GL_STATIC_DRAW);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * sizeof(int), nullptr, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, CovarianceBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 6 * sizeof(float), covarianceMatrices.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedMeansBuffer);
@@ -70,6 +62,18 @@ void Splats::loadToGPU()
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedCovarianceBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 3 * sizeof(float), nullptr, GL_STATIC_DRAW);
 
+
+    //These buffers can have duplicate keys, so we need to allocate enough space for the maximum number of keys
+    //for now, we will allocate space for 2 * numSplats keys
+    //TODO: choose a better number than 2 * numSplats, as this is probably too many
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, indexBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, keyBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, intermediateBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
     std::cout << "Finished loading splats to GPU" << std::endl;
 
 }
@@ -81,7 +85,7 @@ void Splats::loadShaders()
     //load the preprocess shader
     preProcessProgram = loadAndLinkShader("preprocess");
     //load the generate keys shader
-    generateKeysProgram = loadAndLinkShader("countTileSizes");
+    generateKeysProgram = loadAndLinkShader("duplicateKeys");
     //load the draw shader
     drawProgram = loadAndLinkShader("draw");
 }
@@ -289,13 +293,61 @@ void Splats::preprocess(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width,
     glUniform1i(glGetUniformLocation(preProcessProgram, "width"), width);
     glUniform1i(glGetUniformLocation(preProcessProgram, "height"), height);
     //run the shader
-    glDispatchCompute(numSplats, 1, 1);
+    glDispatchCompute(numSplats / 256, 1, 1);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     std::cout << "Finished preprocessing splats" << std::endl;
+
 }
 
-void Splats::countTileSizes()
-{}
+void Splats::duplicateKeys()
+{
+    //the generate keys shader needs the following inputs
+    //the buffer of keys
+    //the buffer of indices
+    //the number of splats
+    //the maximum number of keys we can have (the buffer size)
+
+    //and needs buffers for the following outputs
+    //the buffer of duplicate keys (the same as the buffer of keys)
+
+    std::cout << "Generating keys" << std::endl;
+
+    //bind the shader
+    glUseProgram(generateKeysProgram);
+    //bind the buffers
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, keyBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, indexBuffer);
+    //set the uniforms
+    glUniform1i(glGetUniformLocation(generateKeysProgram, "numSplats"), numSplats);
+    glUniform1i(glGetUniformLocation(generateKeysProgram, "maxKeys"), numSplats * 2);
+    //set the atomic counter to 0
+    GLuint numCulled, numDuplicates;
+    int zero = 0;
+    glGenBuffers(1, &numCulled);
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, numCulled);
+    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), &zero, GL_DYNAMIC_DRAW);
+
+    glGenBuffers(1, &numDuplicates);
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, numDuplicates);
+    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), &zero, GL_DYNAMIC_DRAW);
+    //bind the atomic counter to the shader
+    glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 0, numCulled);
+    glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 1, numDuplicates);
+
+    //run the shader
+    glDispatchCompute(numSplats / 256, 1, 1);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_ATOMIC_COUNTER_BARRIER_BIT);
+    std::cout << "Finished generating keys" << std::endl;
+    //print the atomic counters
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, numCulled);
+    GLuint* numCulledData = (GLuint*)glMapBuffer(GL_ATOMIC_COUNTER_BUFFER, GL_READ_ONLY);
+    std::cout << "num culled: " << numCulledData[0] << std::endl;
+    glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, numDuplicates);
+    GLuint* numDuplicatesData = (GLuint*)glMapBuffer(GL_ATOMIC_COUNTER_BUFFER, GL_READ_ONLY);
+    std::cout << "num duplicates: " << numDuplicatesData[0] << std::endl;
+    glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);
+}
 
 void Splats::sort()
 {}

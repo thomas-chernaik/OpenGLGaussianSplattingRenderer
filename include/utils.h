@@ -24,7 +24,7 @@ std::vector<double> createRandomNumbersDouble(int size, int maxNumber);
 //return a vector floats
 std::vector<float> createRandomNumbersFloat(int size);
 
-std::vector<uint64_t> createRandomNumbersInt(int size, uint64_t maxNumber);
+std::vector<int> createRandomNumbersInt(int size, int maxNumber);
 
 //function to test a buffer is sorted;
 
