@@ -22,12 +22,15 @@ layout(std430, binding = 2) buffer Covariances3D
 //VP matrix uniform
 layout (location = 0)uniform mat4 vpMatrix;
 
+//view matrix uniform
+layout (location = 1)uniform mat3 rotationMatrix;
+
 //the number of splats uniform
-layout (location = 1) uniform int numSplats;
+layout (location = 2) uniform int numSplats;
 
 //screen width and height uniform
-layout (location = 2) uniform int width;
-layout (location = 3) uniform int height;
+layout (location = 3) uniform int width;
+layout (location = 4) uniform int height;
 
 //output
 //tiles touched and depth as a vec2
@@ -53,7 +56,7 @@ const float near = 0.01;
 const float far = 100.0;
 const float allOnes = 0xFFFFFFFF;
 
-vec3 get2DCovariance(mat3 covariance);
+vec3 get2DCovariance(mat3 covariance, vec3 projectedMean, mat3 rotationMatrix);
 float normalisedSpaceToPixelSpace(float value, int numPixels);
 
 void main() {
@@ -88,13 +91,15 @@ void main() {
         keys.data[index] = vec2(allOnes, allOnes);
         return;
     }
-    vec3 cov= vec3(covariances3D.data[index * 3 + 0], covariances3D.data[index * 3 + 1], covariances3D.data[index * 3 + 2]);
     //get the covariance matrix, which is diagonal
-    mat3 covariance = mat3(cov.x, cov.y, cov.z, cov.y, cov.x, cov.y, cov.z, cov.y, cov.x);
+    mat3 covariance3D = mat3(covariances3D.data[index * 6], covariances3D.data[index * 6 + 1], covariances3D.data[index * 6 + 2],
+                             covariances3D.data[index * 6 + 1], covariances3D.data[index * 6 + 3], covariances3D.data[index * 6 + 4],
+                             covariances3D.data[index * 6 + 2], covariances3D.data[index * 6 + 4], covariances3D.data[index * 6 + 5]);
+
     //compute the 2D projection of the covariance matrix
-    vec3 covariance2D = get2DCovariance(covariance);
+    vec3 covariance2D = get2DCovariance(covariance3D, projectedMean.xyz, rotationMatrix);
     //compute the determinant of the covariance matrix
-    float determinant = (cov.x * cov.z) - (cov.y * cov.y);
+    float determinant = (covariance2D.x * covariance2D.z) - (covariance2D.y * covariance2D.y);
     if (determinant <= 0.0) {
         return;
     }
@@ -103,7 +108,7 @@ void main() {
     //compute a bounding box for the splat
     //this will be square, as we compute it via the largest eigenvalue, which could be pointing in any direction
     //calculate the eigenvalues of the covariance matrix
-    float mid = (cov.x + cov.z) * 0.5;
+    float mid = (covariance2D.x + covariance2D.z) * 0.5;
     float eigenvalue1 = mid + sqrt(max(0.1, mid * mid - determinant));
     float eigenvalue2 = mid - sqrt(max(0.1, mid * mid - determinant));
     //calculate the radius of the splat, 3 is a magic number that seems to work well
@@ -164,6 +169,23 @@ float normalisedSpaceToPixelSpace(float value, int numPixels) {
 }
 
 //projects a 3D covariance matrix to 2D
-vec3 get2DCovariance(mat3 covariance) {
-    
+vec3 get2DCovariance(mat3 covariance, vec3 projectedMean, mat3 rotationMatrix)
+{
+    //the original paper clamps the projected mean inside the view frustum, but I don't think this is necessary
+    float lPrime = length(projectedMean);
+    //equation 29 from https://www.cs.umd.edu/~zwicker/publications/EWASplatting-TVCG02.pdf
+    //the splatting code from the paper uses a different jacobian, but I think this one is correct
+    mat3 jacobian = mat3(
+    1/projectedMean.z, 0, -projectedMean.x/(projectedMean.z*projectedMean.z),
+    0, 1/projectedMean.z, -projectedMean.y/(projectedMean.z*projectedMean.z),
+    0,0,0);
+
+    //equation 30 from https://www.cs.umd.edu/~zwicker/publications/EWASplatting-TVCG02.pdf
+    mat3 cov2D = jacobian * rotationMatrix * covariance * transpose(rotationMatrix) * transpose(jacobian);
+
+    //apply low pass filter, provides some anti-aliasing, probs better methods
+    cov2D[0][0] += 0.3;
+    cov2D[1][1] += 0.3;
+    return vec3(cov2D[0][0], cov2D[0][1], cov2D[1][1]);
+
 }

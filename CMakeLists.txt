@@ -18,7 +18,9 @@ add_executable(diss main.cpp
         include/Splats.h
         src/Splats.cpp
         src/sort.cpp
-        src/utils.cpp)
+        src/utils.cpp
+        Camera.cpp
+        Camera.h)
 
 add_executable(tests tests/sortTests.cpp
         include/utils.h

@@ -254,13 +254,17 @@ void Splats::loadSplats(const std::string &filePath)
     std::cout << "Finished loading splats from file" << std::endl;
 }
 
-void Splats::preprocess()
+void Splats::preprocess(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height)
 {
     /*the shader needs the following inputs
      * the buffer of means
      * the buffer of opacities
      * the buffer of precomputed 3D covariance matrices
      * the transform matrix (view matrix * projection matrix)
+     * the rotation matrix as a 3x3 matrix
+     * the number of splats
+     * the screen width
+     * the screen height
      *
      *
      * and needs buffers for the following outputs
@@ -268,7 +272,26 @@ void Splats::preprocess()
      * the buffer of conic opacities (related to the 2D covariance matrices)
      * the buffer of the projected means
      */
-    //culled splats will be given a key of a very large number.
+    std::cout << "Preprocessing splats" << std::endl;
+    //bind the shader
+    glUseProgram(preProcessProgram);
+    //bind the buffers
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, means3DBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, opacitiesBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, CovarianceBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, keyBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, projectedCovarianceBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, projectedMeansBuffer);
+    //set the uniforms
+    glUniformMatrix4fv(glGetUniformLocation(preProcessProgram, "vpMatrix"), 1, GL_FALSE, &vpMatrix[0][0]);
+    glUniformMatrix3fv(glGetUniformLocation(preProcessProgram, "rotationMatrix"), 1, GL_FALSE, &rotationMatrix[0][0]);
+    glUniform1i(glGetUniformLocation(preProcessProgram, "numSplats"), numSplats);
+    glUniform1i(glGetUniformLocation(preProcessProgram, "width"), width);
+    glUniform1i(glGetUniformLocation(preProcessProgram, "height"), height);
+    //run the shader
+    glDispatchCompute(numSplats, 1, 1);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    std::cout << "Finished preprocessing splats" << std::endl;
 }
 
 void Splats::countTileSizes()

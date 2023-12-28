@@ -35,7 +35,7 @@ int main()
     //render image
     //preprocess splats
     std::cout << "Preprocessing splats" << std::endl;
-    splats.preprocess();
+    splats.preprocess(glm::mat4(), glm::mat3(), 0, 0);
     //sort splats
     std::cout << "Sorting splats" << std::endl;
     splats.sort();

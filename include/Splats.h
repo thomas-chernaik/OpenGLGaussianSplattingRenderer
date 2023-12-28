@@ -37,7 +37,7 @@ class Splats
         void loadShaders();
 
         //function to preprocess the splats
-        void preprocess();
+        void preprocess(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height);
 
         //function to generate tile and depth based keys of splats
         void countTileSizes();

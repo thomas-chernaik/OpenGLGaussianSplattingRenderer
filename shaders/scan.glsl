@@ -48,6 +48,7 @@ void main() {
     for (int i = 0; i < keySize; i++) {
         globalHistogram[i] = 0;
     }
+
     //compute the global histogram and the offsets
     for (int i = 0; i < numSections; i++)
     {
