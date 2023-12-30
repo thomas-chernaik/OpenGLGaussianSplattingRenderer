@@ -12,11 +12,10 @@ uint data[];
 } indices;
 
 //uniform for the number of keys
-layout (location = 0) uniform uint numKeys;
+layout (location = 0) uniform int numKeys;
 //uniform for the maximum number of keys
-layout (location = 1) uniform uint maxNumKeys;
+layout (location = 1) uniform int maxNumKeys;
 
-const float allOnes = 0xFFFFFFFF;
 
 //atomic counter for the number of culled splats
 layout(binding = 0, offset = 0) uniform atomic_uint numCulledSplats;
@@ -24,7 +23,7 @@ layout(binding = 0, offset = 0) uniform atomic_uint numCulledSplats;
 layout(binding = 1, offset = 0) uniform atomic_uint numDuplicatedSplats;
 
 void main() {
-    atomicCounterIncrement(numCulledSplats);
+    uint allOnes = 0xFFFFFFFF;
     //get the index of the splat
     uint index = gl_GlobalInvocationID.x;
     //if the index is greater than the number of keys, return
@@ -46,8 +45,8 @@ void main() {
     keys.data[index].x = firstKey;
     //work out the number of keys to unpack
     uint numKeysToUnpack = 1;
-    for(uint i=1; i<7; i++) {
-        if((keysToUnpack & (0xF << i)) != 0) {
+    for(uint i=1; i<3; i++) {
+        if((keysToUnpack & (0xFF << i*8)) != 0) {
             numKeysToUnpack++;
         }
     }
@@ -55,7 +54,7 @@ void main() {
     //this gets skipped if there is only one key to unpack
     for(uint i=1; i<numKeysToUnpack; i++) {
         //get the key
-        float keyToUnpack = uintBitsToFloat((keysToUnpack >> (i*4)) & 0xF);
+        float keyToUnpack = uintBitsToFloat((keysToUnpack >> (i*8)) & 0xFF);
         uint keyIndex = atomicCounterIncrement(numDuplicatedSplats) + numKeys;
         //write the key out
         keys.data[keyIndex] = vec2(keyToUnpack, depth);

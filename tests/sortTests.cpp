@@ -205,7 +205,8 @@ TEST(SortTest, SortTest) {
     //GPURadixSort(buffer, outputBuffer, randomNumbers.size());
 
 
-    GPURadixSort2(histogramProgram, sortProgram, buffer, outputBuffer, orderBuffer, histogramBuffer, randomNumbers.size(), 8, 256);
+    GPURadixSort2(histogramProgram, 0, sortProgram, buffer, outputBuffer, orderBuffer, histogramBuffer,
+                  randomNumbers.size(), 8, 256);
     //deep copy random numbers
     std::vector<int> randomNumbersCopy(randomNumbers);
 

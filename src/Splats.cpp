@@ -69,9 +69,9 @@ void Splats::loadToGPU()
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, indexBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, keyBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, intermediateBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, intermediateBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats  * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
     std::cout << "Finished loading splats to GPU" << std::endl;
@@ -296,6 +296,41 @@ void Splats::preprocess(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width,
     glDispatchCompute(numSplats / 256, 1, 1);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     std::cout << "Finished preprocessing splats" << std::endl;
+#ifndef DEBUG
+    //print out the keys (buffer of vec2s)
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, keyBuffer);
+    int numDupes = 0;
+    int numCulled = 0;
+    glm::vec2* keys = (glm::vec2*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    unsigned int allOnes = 0xFFFFFFFF;
+    for(int i = 0; i < numSplats; i++)
+    {
+        //convert the 2 keys to unsigned ints, witht the same bit pattern
+        unsigned int key1 = *(unsigned int*)&keys[i][0];
+        unsigned int key2 = *(unsigned int*)&keys[i][1];
+        //don't print out the keys that are all ones
+        if(key1 != allOnes && key2 != allOnes)
+        {
+            //std::cout << "key1: " << std::bitset<32>(key1) << std::endl;
+            //std::cout << "key2: " << std::bitset<32>(key2) << std::endl;
+            for(uint i=1; i<3; i++) {
+                if((key1 & (0xFF << i * 8)) != 0) {
+                    numDupes++;
+                    std::cout << "Key" << key1 << std::endl;
+                }
+            }
+        }
+        else
+        {
+            numCulled++;
+        }
+        //
+
+    }
+    std::cout << "num duplicates: " << numDupes << std::endl;
+    std::cout << "num culled: " << numCulled << std::endl;
+#endif
+
 
 }
 
@@ -318,8 +353,8 @@ void Splats::duplicateKeys()
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, keyBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, indexBuffer);
     //set the uniforms
-    glUniform1i(glGetUniformLocation(generateKeysProgram, "numSplats"), numSplats);
-    glUniform1i(glGetUniformLocation(generateKeysProgram, "maxKeys"), numSplats * 2);
+    glUniform1i(0, numSplats);
+    glUniform1i(glGetUniformLocation(generateKeysProgram, "maxNumKeys"), numSplats * 2);
     //set the atomic counter to 0
     GLuint numCulled, numDuplicates;
     int zero = 0;
@@ -335,7 +370,7 @@ void Splats::duplicateKeys()
     glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 1, numDuplicates);
 
     //run the shader
-    glDispatchCompute(numSplats / 256, 1, 1);
+    glDispatchCompute(ceil(numSplats / 1024.f), 1, 1);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_ATOMIC_COUNTER_BARRIER_BIT);
     std::cout << "Finished generating keys" << std::endl;
     //print the atomic counters

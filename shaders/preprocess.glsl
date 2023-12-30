@@ -53,8 +53,8 @@ layout(std430, binding = 5) buffer ProjectedMeans
 
 
 const float near = 0.01;
-const float far = 100.0;
-const float allOnes = 0xFFFFFFFF;
+const float far = 1000.0;
+const uint allOnes = 0xFFFFFFFF;
 
 vec3 get2DCovariance(mat3 covariance, vec3 projectedMean, mat3 rotationMatrix);
 float normalisedSpaceToPixelSpace(float value, int numPixels);
@@ -65,7 +65,7 @@ void main() {
     //if the index is greater than the number of splats, return
     if (index >= numSplats) {
         //set keys to a value we can recognise and ignore later
-        keys.data[index] = vec2(allOnes, allOnes);
+        keys.data[index] = vec2(uintBitsToFloat(allOnes), uintBitsToFloat(allOnes));
 
         return;
     }
@@ -80,15 +80,16 @@ void main() {
     //get the depth
     float depth = projectedMean.z;
     //near and far cull
-    if (depth < near || depth > far) {
+    if (depth < near) {
+        keys.data[index] = vec2(uintBitsToFloat(allOnes), uintBitsToFloat(allOnes));
         return;
     }
 
     //get the opacity
     float opacity = opacities.data[index];
     //if the opacity is zero, return
-    if (opacity == 0.0) {
-        keys.data[index] = vec2(allOnes, allOnes);
+    if (opacity < 0.05) {
+        keys.data[index] = vec2(uintBitsToFloat(allOnes), uintBitsToFloat(allOnes));
         return;
     }
     //get the covariance matrix, which is diagonal
@@ -101,6 +102,7 @@ void main() {
     //compute the determinant of the covariance matrix
     float determinant = (covariance2D.x * covariance2D.z) - (covariance2D.y * covariance2D.y);
     if (determinant <= 0.0) {
+        keys.data[index] = vec2(uintBitsToFloat(allOnes), uintBitsToFloat(allOnes));
         return;
     }
     float inverseDeterminant = 1.0 / determinant;
@@ -127,27 +129,37 @@ void main() {
     maxX /= widthDiv16;
     minY /= heightDiv16;
     maxY /= heightDiv16;
+    //if mins are more than 15, or maxes are less than 0, return
+    if (minX > 15 || maxX < 0 || minY > 15 || maxY < 0) {
+        keys.data[index] = vec2(uintBitsToFloat(allOnes), uintBitsToFloat(allOnes));
+        return;
+    }
+    //clamp the bounding box to the screen
+    minX = clamp(minX, 0, 15);
+    maxX = clamp(maxX, 0, 15);
+    minY = clamp(minY, 0, 15);
+    maxY = clamp(maxY, 0, 15);
     int numOverlappingTiles = 0;
     uint keysToWrite = 0;
     for(int x=minX; x<=maxX; x++) {
         for (int y=minY; y<=maxY; y++) {
             //if we've already found 8 overlapping tiles, return
-            if (numOverlappingTiles == 8) {
-                keys.data[index] = vec2(allOnes, allOnes);
+            if (numOverlappingTiles == 4) {
+                keys.data[index] = vec2(uintBitsToFloat(allOnes), uintBitsToFloat(allOnes));
                 return;
             }
             //calculate the index of the tile
-            uint tileIndex = x + y * 16;
+            uint tileIndex = uint(x) + uint(y) * 16;
             //set the key to the 4*numOverlappingTiles to the tile index
-            keysToWrite &= (tileIndex << (4 * numOverlappingTiles));
+            keysToWrite |= (tileIndex << (8 * numOverlappingTiles));
             //increment the number of overlapping tiles
             numOverlappingTiles++;
 
         }
     }
     //if the number of overlapping tiles is zero, return
-    if (numOverlappingTiles == 0 || numOverlappingTiles > 8) {
-        keys.data[index] = vec2(allOnes, allOnes);
+    if (numOverlappingTiles == 0 || numOverlappingTiles > 4) {
+        keys.data[index] = vec2(uintBitsToFloat(allOnes), uintBitsToFloat(allOnes));
         return;
     }
     float keysFloatEncoding = uintBitsToFloat(keysToWrite);

@@ -16,7 +16,9 @@ void createAndLinkSortAndHistogramShaders(GLuint &histogramProgram, GLuint &sort
 
 //function to create and link the shader we will use later
 void createAndLinkSortShader(GLuint &program);
-void GPURadixSort2(GLuint histogramProgram, GLuint sortProgram, GLuint buffer, GLuint outputBuffer, GLuint orderBuffer, GLuint histogramBuffer, int size, int workGroupCount, int workGroupSize);
+void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sortProgram, GLuint buffer,
+                   GLuint intermediateBuffer, GLuint orderBuffer, GLuint histogramBuffer, int size, int workGroupCount,
+                   int workGroupSize);
 
 void GPURadixSort(GLuint program, GLuint buffer, GLuint outputBuffer, int size);
 

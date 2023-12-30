@@ -5,12 +5,12 @@ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 //the input buffer of keys to be sorted
 layout (std430, binding = 0)  buffer InputBuffer {
-    int data[];
+    vec2 data[];
 } inputBuffer;
-//the output buffer of sorted keys
-layout (std430, binding = 1) buffer OutputBuffer {
+//the intermediate buffer for the keys so we don't have to sort in place
+layout (std430, binding = 1) buffer IntermediateBuffer {
     int data[];
-} outputBuffer;
+} intermediateBuffer;
 //the output buffer for the order of the keys
 layout (std430, binding = 3) buffer OrderBuffer {
     int data[];
@@ -25,18 +25,41 @@ layout ( location=0 ) uniform int numSections;
 //the size of each segment (number of values each thread is responsible for)
 layout ( location=1 ) uniform int sectionSize;
 //the segment
-layout ( location=2 ) uniform int segment;
+layout ( location=2 ) uniform int segmentReadOnly;
 
 //the size of each key in bits
 const int keySize = 16;
 
-
+shared int globalPrefixSum[16];
 void main() {
+    //the segment we are sorting on
+    int segment = segmentReadOnly;
     //the start index of the section
     int startIdx = int(gl_GlobalInvocationID.x) * sectionSize;
     //the mask to extract the bits we are sorting on
     uint mask = 0x000000000000000F << (segment * 4);
 
+    //work out if we are working on the x values or the y values
+    bool sortX = segment > 7;
+    segment -= sortX ? 8 : 0;
+
+    //if we are the first thread in the work group, we need to fetch the global histogram
+    if(gl_LocalInvocationID.x == 0)
+    {
+        for(int i = 0; i < 16; i++)
+        {
+            globalPrefixSum[i] = globalHistogramsBuffer.data[i + (16*numSections)];
+        }
+    }
+    //wait for the first thread to finish
+    barrier();
+    //now we fetch the local offsets
+    int offsets[16];
+    for(int i = 0; i < 16; i++)
+    {
+        offsets[i] = globalHistogramsBuffer.data[i + (16*int(gl_GlobalInvocationID.x))];
+    }
+    /*
     //now we need to work out where each key will go in the output buffer
     //we use two values
     //the prefix sum, which is the sum of all values less than the current value
@@ -69,15 +92,19 @@ void main() {
     {
         globalPrefixSum[i] = globalPrefixSum[i - 1] + globalHistogram[i - 1];
     }
+    */
     int outputSize = 64;
     int outputt[64];
-
+    uint index;
     //write the output
     for (int i = startIdx; i < startIdx + sectionSize; i+=outputSize)
     {
         for(int j = 0; j < outputSize; j++)
         {
-            int index = int((inputBuffer.data[orderBuffer.data[i+j]] & mask) >> (segment * 4));
+            if(sortX)
+                index = uint((floatBitsToUint(inputBuffer.data[orderBuffer.data[i+j]].x) & mask) >> (segment * 4));
+            else
+                index = uint((floatBitsToUint(inputBuffer.data[orderBuffer.data[i+j]].y) & mask) >> (segment * 4));
             int sortedIdx = globalPrefixSum[index] + offsets[index];
             //int dataToWrite = orderBuffer.data[i+j];
             //outputBuffer.data[sortedIdx] = dataToWrite;
@@ -86,7 +113,7 @@ void main() {
         }
         for(int j = 0; j < outputSize; j++)
         {
-            outputBuffer.data[outputt[j]] = orderBuffer.data[i+j];
+            intermediateBuffer.data[outputt[j]] = orderBuffer.data[i+j];
         }
 
     }

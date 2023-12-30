@@ -130,7 +130,9 @@ void createAndLinkSortShader(GLuint &program)
     std::cout << "compiled and linked sorting shader" << std::endl;
 }
 
-void GPURadixSort2(GLuint histogramProgram, GLuint sortProgram, GLuint buffer, GLuint outputBuffer, GLuint orderBuffer, GLuint histogramBuffer, int size, int workGroupCount, int workGroupSize)
+void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sortProgram, GLuint buffer,
+                   GLuint intermediateBuffer, GLuint orderBuffer, GLuint histogramBuffer, int size, int workGroupCount,
+                   int workGroupSize)
 {
     //create query object
     GLuint startTimeQuery, endTimeQuery;
@@ -157,11 +159,16 @@ void GPURadixSort2(GLuint histogramProgram, GLuint sortProgram, GLuint buffer, G
         glDispatchCompute(workGroupCount, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
+        //calculate the prefix sum
+        glUseProgram(prefixSumProgram);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, histogramBuffer);
+        glUniform1i(glGetUniformLocation(prefixSumProgram, "numSections"), numberOfSections);
+
 
         //scan the histograms
         glUseProgram(sortProgram);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, outputBuffer);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, intermediateBuffer);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, histogramBuffer);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, orderBuffer);
         glUniform1i(glGetUniformLocation(sortProgram, "sectionSize"), sectionSize);
@@ -172,10 +179,10 @@ void GPURadixSort2(GLuint histogramProgram, GLuint sortProgram, GLuint buffer, G
 
         //swap the output and order buffers
         GLuint temp = orderBuffer;
-        orderBuffer = outputBuffer;
-        outputBuffer = temp;
+        orderBuffer = intermediateBuffer;
+        intermediateBuffer = temp;
     }
-    //outputBuffer;
+    //intermediateBuffer;
     //stop the timer
     glQueryCounter(endTimeQuery, GL_TIMESTAMP);
 

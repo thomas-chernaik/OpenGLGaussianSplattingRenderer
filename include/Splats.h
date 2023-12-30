@@ -12,6 +12,7 @@
 #include <cmath>
 #include <algorithm>
 #include <array>
+#include <bitset>
 
 #include "sort.h"
 #include "utils.h"

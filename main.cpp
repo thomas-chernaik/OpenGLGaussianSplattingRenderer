@@ -37,7 +37,7 @@ int main()
 
 
     //initialise camera
-    Camera camera(0.0f, 0.0f, 3.0f);
+    Camera camera(0.0f, 0.0f, -10.0f);
     camera.update();
 
     Splats splats("models/point_cloud.ply");
@@ -46,7 +46,7 @@ int main()
     //preprocess splats
     std::cout << "Preprocessing splats" << std::endl;
 
-    splats.preprocess(camera.getViewMatrix() * camera.getProjectionMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
+    splats.preprocess( camera.getProjectionMatrix() * camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
 
     //duplicate splats
     //start timer query
