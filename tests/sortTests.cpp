@@ -5,6 +5,7 @@
 #include <GLFW/glfw3.h>
 #include <gtest/gtest.h>
 #include <stdexcept>
+#include <glm/vec2.hpp>
 #include "utils.h"
 #include "sort.h"
 
@@ -115,6 +116,13 @@ void radixSort()
     }
 }*/
 
+void sortVec2(std::vector<glm::vec2> list)
+{
+    //cpu sort to check
+    std::sort(list.begin(), list.end(), [](glm::vec2 a, glm::vec2 b) {
+        return a.y < b.y;
+    });}
+
 //create tests for the sort function
 TEST(SortTest, SortTest) {
     //start timer
@@ -152,8 +160,8 @@ TEST(SortTest, SortTest) {
 
     std::cout << "compiling shaders" << std::endl;
     //createAndLinkSortShader();
-    GLuint histogramProgram, sortProgram;
-    createAndLinkSortAndHistogramShaders(histogramProgram, sortProgram);
+    GLuint histogramProgram, sortProgram, sumProgram;
+    createAndLinkSortAndHistogramShaders(histogramProgram, sortProgram, sumProgram);
     std::cout << "compiled shaders" << std::endl;
 
     //create buffer
@@ -170,12 +178,12 @@ TEST(SortTest, SortTest) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, orderBuffer);
     //create random numbers
 
-    std::vector<int> randomNumbers = createRandomNumbersInt(256*16*512, pow(2, 32));
+    std::vector<glm::uvec2> randomNumbers = createRandomNumbersVec2(1024*1024, 500000);
     //print the max number
-    std::cout << "max number: " << *std::max_element(randomNumbers.begin(), randomNumbers.end()) << std::endl;
+    //std::cout << "max number: " << *std::max_element(randomNumbers.begin(), randomNumbers.end()) << std::endl;
     //fill the input buffer with random numbers
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, randomNumbers.size() * sizeof(int), randomNumbers.data(), GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, randomNumbers.size() * 2 * sizeof(int), randomNumbers.data(), GL_STATIC_DRAW);
     int* bufferData = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
 
     //fill the order buffer with ascending numbers
@@ -192,7 +200,7 @@ TEST(SortTest, SortTest) {
 
 
     //create the histogram buffer to use later
-    int histogramSize = 16 * 8*256;
+    int histogramSize = 16 * 8*256 + 16;
     GLuint histogramBuffer;
     glGenBuffers(1, &histogramBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);
@@ -205,16 +213,19 @@ TEST(SortTest, SortTest) {
     //GPURadixSort(buffer, outputBuffer, randomNumbers.size());
 
 
-    GPURadixSort2(histogramProgram, 0, sortProgram, buffer, outputBuffer, orderBuffer, histogramBuffer,
+    GPURadixSort2(histogramProgram, sumProgram, sortProgram, buffer, outputBuffer, orderBuffer, histogramBuffer,
                   randomNumbers.size(), 8, 256);
     //deep copy random numbers
-    std::vector<int> randomNumbersCopy(randomNumbers);
+    std::vector<glm::uvec2> randomNumbersCopy(randomNumbers);
 
     //sort random numbers on cpu
     double currentTime = glfwGetTime();
-    std::sort(randomNumbers.begin(), randomNumbers.end());
+    //cpu sort to check
+    std::sort(randomNumbers.begin(), randomNumbers.end(), [](glm::vec2 a, glm::vec2 b) {
+        return a.y < b.y;
+    });
     std::cout << "CPU sort took " << glfwGetTime() - currentTime << " seconds" << std::endl;
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, orderBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputBuffer);
     int* outputBufferData = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
     //copy buffer data to vector
     std::vector<int> outputBufferVector(outputBufferData, outputBufferData + randomNumbers.size());
@@ -223,12 +234,12 @@ TEST(SortTest, SortTest) {
         int errors = 0;
         //get buffer data
         for (int i = 1; i < randomNumbers.size(); i++) {
-            ASSERT_GE(randomNumbersCopy[outputBufferVector[i]], randomNumbersCopy[outputBufferVector[i - 1]]);
-            if(randomNumbersCopy[outputBufferVector[i]] < randomNumbersCopy[outputBufferVector[i - 1]]) {
+            ASSERT_GE(randomNumbersCopy[outputBufferVector[i]].y, randomNumbersCopy[outputBufferVector[i - 1]].y);
+            if(randomNumbersCopy[outputBufferVector[i]].y < randomNumbersCopy[outputBufferVector[i - 1]].y) {
                 //std::cout << i << std::endl;
                 errors++;
             }
-            ASSERT_EQ(randomNumbersCopy[outputBufferVector[i]], randomNumbers[i]);
+            ASSERT_EQ(randomNumbersCopy[outputBufferVector[i]].y, randomNumbers[i].y);
 
         }
         std::cout << "number of errors: " << errors << std::endl;

@@ -5,7 +5,7 @@ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 //the input buffer of keys to be sorted
 layout (std430, binding = 0)  buffer InputBuffer {
-    vec2 data[];
+    uvec2 data[];
 } inputBuffer;
 //the intermediate buffer for the keys so we don't have to sort in place
 layout (std430, binding = 1) buffer IntermediateBuffer {
@@ -37,19 +37,16 @@ void main() {
     //the start index of the section
     int startIdx = int(gl_GlobalInvocationID.x) * sectionSize;
     //the mask to extract the bits we are sorting on
-    uint mask = 0x000000000000000F << (segment * 4);
+    uint mask = 0x0000000F << (segment * 4);
 
     //work out if we are working on the x values or the y values
     bool sortX = segment > 7;
     segment -= sortX ? 8 : 0;
 
     //if we are the first thread in the work group, we need to fetch the global histogram
-    if(gl_LocalInvocationID.x == 0)
+    if(gl_LocalInvocationID.x < 16)
     {
-        for(int i = 0; i < 16; i++)
-        {
-            globalPrefixSum[i] = globalHistogramsBuffer.data[i + (16*numSections)];
-        }
+        globalPrefixSum[gl_LocalInvocationID.x] = globalHistogramsBuffer.data[gl_LocalInvocationID.x + (16*numSections)];
     }
     //wait for the first thread to finish
     barrier();
@@ -101,20 +98,25 @@ void main() {
     {
         for(int j = 0; j < outputSize; j++)
         {
+            uvec2 key = inputBuffer.data[orderBuffer.data[i+j]];
             if(sortX)
-                index = uint((floatBitsToUint(inputBuffer.data[orderBuffer.data[i+j]].x) & mask) >> (segment * 4));
+                index = ((key.x) & mask) >> (segment * 4);
             else
-                index = uint((floatBitsToUint(inputBuffer.data[orderBuffer.data[i+j]].y) & mask) >> (segment * 4));
-            int sortedIdx = globalPrefixSum[index] + offsets[index];
-            //int dataToWrite = orderBuffer.data[i+j];
-            //outputBuffer.data[sortedIdx] = dataToWrite;
+                index = ((key.y) & mask) >> (segment * 4);
+            int sortedIdx = globalPrefixSum[index] + offsets[index]++;
             outputt[j] = sortedIdx;
-            offsets[index]++;
+            //offsets[index]++;
+            //intermediateBuffer.data[i+j] = sortedIdx;
+            //intermediateBuffer.data[i+j] = globalPrefixSum[index];
+            intermediateBuffer.data[sortedIdx] = orderBuffer.data[i+j];
         }
         for(int j = 0; j < outputSize; j++)
         {
-            intermediateBuffer.data[outputt[j]] = orderBuffer.data[i+j];
+            //intermediateBuffer.data[outputt[j]] = orderBuffer.data[i+j];
+            //intermediateBuffer.data[i+j] = outputt[j];
+
         }
 
     }
+
 }

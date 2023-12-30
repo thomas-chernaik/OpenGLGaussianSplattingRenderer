@@ -4,7 +4,7 @@
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 //the input buffer of keys to be sorted
 layout (std430, binding = 0)  buffer InputBuffer {
-    vec2 data[];
+    uvec2 data[];
 } inputBuffer;
 //the order buffer
 layout (std430, binding = 1) buffer OrderBuffer {
@@ -48,12 +48,13 @@ void main()
     uint index;
     //compute the local histogram
     for (int i = startIdx; i < startIdx + sectionSize; i++) {
+        uvec2 key = inputBuffer.data[orderBuffer.data[i]];
         if(sortX)
             //extract the bits we are sorting on (x values)
-            index = uint((floatBitsToUint(inputBuffer.data[orderBuffer.data[i]].x) & mask) >> (segment * 4));
+            index = ((key.x) & mask) >> (segment * 4);
         else
             //extract the bits we are sorting on (y values
-            index = uint((floatBitsToUint(inputBuffer.data[orderBuffer.data[i]].y) & mask) >> (segment * 4));
+            index = ((key.y) & mask) >> (segment * 4);
         histogram[index]++;
     }
 

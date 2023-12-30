@@ -10,6 +10,7 @@
 #include <vector>
 #include <random>
 #include <algorithm>
+#include <glm/vec2.hpp>
 
 #ifndef UTILS_H
 #define UTILS_H
@@ -26,6 +27,7 @@ std::vector<float> createRandomNumbersFloat(int size);
 
 std::vector<int> createRandomNumbersInt(int size, int maxNumber);
 
+std::vector<glm::uvec2> createRandomNumbersVec2(int size, int maxNumber);
 //function to test a buffer is sorted;
 
 //function to load and link a shader

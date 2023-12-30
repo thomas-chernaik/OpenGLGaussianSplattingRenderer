@@ -14,7 +14,7 @@
 #define DISS_SORT_CPP
 
 //function to create and link the shaders we will use later
-void createAndLinkSortAndHistogramShaders(GLuint &histogramProgram, GLuint &sortProgram)
+void createAndLinkSortAndHistogramShaders(GLuint &histogramProgram, GLuint &sortProgram, GLuint &sumProgram)
 {
     std::cout << "compiling sorting shaders" << std::endl;
     //read shader file for histogram
@@ -85,6 +85,41 @@ void createAndLinkSortAndHistogramShaders(GLuint &histogramProgram, GLuint &sort
         glfwTerminate();
         return;
     }
+
+    //read shader file for sum
+    std::string sumShaderCode = readShaderFile("shaders/computePrefixSum.glsl");
+
+    //create sum shader
+    GLuint sumShader = glCreateShader(GL_COMPUTE_SHADER);
+    const char *sumShaderCodePtr = sumShaderCode.c_str();
+    glShaderSource(sumShader, 1, &sumShaderCodePtr, nullptr);
+    glCompileShader(sumShader);
+
+    //check sum shader compiled
+    glGetShaderiv(sumShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        // Compilation failed, print error log
+        char infoLog[512];
+        glGetShaderInfoLog(sumShader, 512, nullptr, infoLog);
+        std::cout << "Shader compilation failed:\n" << infoLog << std::endl;
+        glfwTerminate();
+        return;
+    }
+
+    //create sum program and attach shader
+    sumProgram = glCreateProgram();
+    glAttachShader(sumProgram, sumShader);
+    glLinkProgram(sumProgram);
+
+    //check sum program linked
+    glGetProgramiv(sumProgram, GL_LINK_STATUS, &success);
+    if (!success)
+    {
+        std::cerr << "Failed to link sum program" << std::endl;
+        glfwTerminate();
+        return;
+    }
+
     std::cout << "compiled and linked sorting shaders" << std::endl;
 }
 
@@ -155,7 +190,7 @@ void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sort
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, histogramBuffer);
         glUniform1i(glGetUniformLocation(histogramProgram, "sectionSize"), sectionSize);
         glUniform1i(glGetUniformLocation(histogramProgram, "numSections"), numberOfSections);
-        glUniform1i(glGetUniformLocation(histogramProgram, "segment"), i);
+        glUniform1i(glGetUniformLocation(histogramProgram, "segmentReadOnly"), i);
         glDispatchCompute(workGroupCount, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
@@ -163,6 +198,8 @@ void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sort
         glUseProgram(prefixSumProgram);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, histogramBuffer);
         glUniform1i(glGetUniformLocation(prefixSumProgram, "numSections"), numberOfSections);
+        glDispatchCompute(1, 1, 1);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
 
         //scan the histograms
@@ -173,7 +210,7 @@ void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sort
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, orderBuffer);
         glUniform1i(glGetUniformLocation(sortProgram, "sectionSize"), sectionSize);
         glUniform1i(glGetUniformLocation(sortProgram, "numSections"), numberOfSections);
-        glUniform1i(glGetUniformLocation(sortProgram, "segment"), i);
+        glUniform1i(glGetUniformLocation(sortProgram, "segmentReadOnly"), i);
         glDispatchCompute(workGroupCount, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 

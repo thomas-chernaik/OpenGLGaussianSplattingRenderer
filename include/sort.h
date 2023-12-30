@@ -12,7 +12,7 @@
 #define DISS_SORT_H
 
 //function to create and link the shaders we will use later
-void createAndLinkSortAndHistogramShaders(GLuint &histogramProgram, GLuint &sortProgram);
+void createAndLinkSortAndHistogramShaders(GLuint &histogramProgram, GLuint &sortProgram, GLuint &sumProgram);
 
 //function to create and link the shader we will use later
 void createAndLinkSortShader(GLuint &program);

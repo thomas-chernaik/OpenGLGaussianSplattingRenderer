@@ -81,7 +81,7 @@ void Splats::loadToGPU()
 void Splats::loadShaders()
 {
     //load the sort and histogram shaders
-    createAndLinkSortAndHistogramShaders(histogramProgram, sortProgram);
+    createAndLinkSortAndHistogramShaders(histogramProgram, sortProgram, prefixSumProgram);
     //load the preprocess shader
     preProcessProgram = loadAndLinkShader("preprocess");
     //load the generate keys shader

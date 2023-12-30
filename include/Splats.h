@@ -95,6 +95,7 @@ class Splats
         GLuint generateKeysProgram;
         GLuint sortProgram;
         GLuint histogramProgram;
+        GLuint prefixSumProgram;
         GLuint drawProgram;
 
 

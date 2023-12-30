@@ -3,7 +3,7 @@ layout (local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 
 //buffer for the keys
 layout(std430, binding = 0) buffer Keys {
-    vec2 data[];
+    uvec2 data[];
 } keys;
 
 //buffer for the splat indices
@@ -31,9 +31,9 @@ void main() {
         return;
     }
     //get the key
-    vec2 key = keys.data[index];
-    float depth = key.y;
-    uint keysToUnpack = floatBitsToUint(key.x);
+    uvec2 key = keys.data[index];
+    uint depth = key.y;
+    uint keysToUnpack = key.x;
     //convert the keysToUnpack to an integer
     //check the splat isn't culled (keysToUnpack == FFFFFFFF)
     if(keysToUnpack == allOnes) {
@@ -41,8 +41,7 @@ void main() {
         return;
     }
     //write the first splat key out (in place)
-    float firstKey = uintBitsToFloat(keysToUnpack & 0xF);
-    keys.data[index].x = firstKey;
+    keys.data[index].x = keysToUnpack & 0xF;
     //work out the number of keys to unpack
     uint numKeysToUnpack = 1;
     for(uint i=1; i<3; i++) {
@@ -54,10 +53,10 @@ void main() {
     //this gets skipped if there is only one key to unpack
     for(uint i=1; i<numKeysToUnpack; i++) {
         //get the key
-        float keyToUnpack = uintBitsToFloat((keysToUnpack >> (i*8)) & 0xFF);
+        float keyToUnpack = (keysToUnpack >> (i*8)) & 0xFF;
         uint keyIndex = atomicCounterIncrement(numDuplicatedSplats) + numKeys;
         //write the key out
-        keys.data[keyIndex] = vec2(keyToUnpack, depth);
+        keys.data[keyIndex] = uvec2(keyToUnpack, depth);
         //write the index out
         indices.data[keyIndex] = index;
     }

@@ -10,6 +10,7 @@
 #include <vector>
 #include <random>
 #include <algorithm>
+#include <glm/vec2.hpp>
 #include "utils.h"
 
 #ifndef UTILS_CPP
@@ -126,6 +127,23 @@ GLuint loadAndLinkShader(std::string shaderName)
     }
     std::cout << "compiled and linked " << shaderName << " shader" << std::endl;
     return program;
+}
+
+std::vector<glm::uvec2> createRandomNumbersVec2(int size, int maxNumber) {
+    int seed = 0;
+    std::vector<glm::uvec2> randomNumbers(size);
+    std::random_device rd;
+    //use the seed to create a random number generator
+    std::mt19937 gen = std::mt19937 (rd());
+    gen.seed(seed);
+    //create a uniform distribution of numbers between 0 and maxNumber
+    std::uniform_int_distribution<int> dis(0, maxNumber - 1);
+
+    std::generate(randomNumbers.begin(), randomNumbers.end(), [&]() {
+        return glm::uvec2(dis(gen), dis(gen));
+    });
+
+    return randomNumbers;
 }
 
 
