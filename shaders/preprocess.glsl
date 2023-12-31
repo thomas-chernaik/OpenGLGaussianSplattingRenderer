@@ -36,7 +36,7 @@ layout (location = 4) uniform int height;
 //tiles touched and depth as a vec2
 layout(std430, binding = 3) buffer Keys
 {
-    vec2 data[];
+    uvec2 data[];
 } keys;
 
 //conic opacities
@@ -65,7 +65,7 @@ void main() {
     //if the index is greater than the number of splats, return
     if (index >= numSplats) {
         //set keys to a value we can recognise and ignore later
-        keys.data[index] = vec2(uintBitsToFloat(allOnes), uintBitsToFloat(allOnes));
+        keys.data[index] = uvec2(allOnes, allOnes);
 
         return;
     }
@@ -81,7 +81,7 @@ void main() {
     float depth = projectedMean.z;
     //near and far cull
     if (depth < near) {
-        keys.data[index] = vec2(uintBitsToFloat(allOnes), uintBitsToFloat(allOnes));
+        keys.data[index] = uvec2(allOnes, allOnes);
         return;
     }
 
@@ -89,7 +89,7 @@ void main() {
     float opacity = opacities.data[index];
     //if the opacity is zero, return
     if (opacity < 0.05) {
-        keys.data[index] = vec2(uintBitsToFloat(allOnes), uintBitsToFloat(allOnes));
+        keys.data[index] = uvec2(allOnes, allOnes);
         return;
     }
     //get the covariance matrix, which is diagonal
@@ -102,7 +102,7 @@ void main() {
     //compute the determinant of the covariance matrix
     float determinant = (covariance2D.x * covariance2D.z) - (covariance2D.y * covariance2D.y);
     if (determinant <= 0.0) {
-        keys.data[index] = vec2(uintBitsToFloat(allOnes), uintBitsToFloat(allOnes));
+        keys.data[index] = uvec2(allOnes, allOnes);
         return;
     }
     float inverseDeterminant = 1.0 / determinant;
@@ -131,7 +131,7 @@ void main() {
     maxY /= heightDiv16;
     //if mins are more than 15, or maxes are less than 0, return
     if (minX > 15 || maxX < 0 || minY > 15 || maxY < 0) {
-        keys.data[index] = vec2(uintBitsToFloat(allOnes), uintBitsToFloat(allOnes));
+        keys.data[index] = uvec2(allOnes, allOnes);
         return;
     }
     //clamp the bounding box to the screen
@@ -145,7 +145,7 @@ void main() {
         for (int y=minY; y<=maxY; y++) {
             //if we've already found 8 overlapping tiles, return
             if (numOverlappingTiles == 4) {
-                keys.data[index] = vec2(uintBitsToFloat(allOnes), uintBitsToFloat(allOnes));
+                keys.data[index] = uvec2(allOnes, allOnes);
                 return;
             }
             //calculate the index of the tile
@@ -159,12 +159,17 @@ void main() {
     }
     //if the number of overlapping tiles is zero, return
     if (numOverlappingTiles == 0 || numOverlappingTiles > 4) {
-        keys.data[index] = vec2(uintBitsToFloat(allOnes), uintBitsToFloat(allOnes));
+        keys.data[index] = uvec2(allOnes, allOnes);
         return;
     }
-    float keysFloatEncoding = uintBitsToFloat(keysToWrite);
+    //convert the depth to an integer
+    uint depthInt = uint(depth * 1000.0);
+    //cap the depth to 20 bits. This allows us to do less passes for the sorting
+    depthInt = clamp(depthInt, 0, 1048575);
+    //OPTIMISATION: we can store the tile index along with the depth because we have the bits spare
+    depthInt = depthInt | (keysToWrite << 20);
     //set the values
-    keys.data[index] = vec2(keysFloatEncoding, depth);
+    keys.data[index] = uvec2(keysToWrite, depthInt);
     conicOpacities.data[index] = vec4(conic, opacity);
     projectedMeans.data[index] = projectedMeanPixelSpace;
 

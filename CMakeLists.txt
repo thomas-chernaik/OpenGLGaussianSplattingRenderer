@@ -21,7 +21,7 @@ add_executable(diss main.cpp
         src/sort.cpp
         src/utils.cpp
         src/Camera.cpp
-        )
+)
 
 add_executable(tests tests/sortTests.cpp
         include/utils.h

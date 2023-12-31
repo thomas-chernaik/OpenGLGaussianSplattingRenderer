@@ -178,7 +178,7 @@ TEST(SortTest, SortTest) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, orderBuffer);
     //create random numbers
 
-    std::vector<glm::uvec2> randomNumbers = createRandomNumbersVec2(1024*1024, 500000);
+    std::vector<glm::uvec2> randomNumbers = createRandomNumbersVec2(1024*1024, 65534);
     //print the max number
     //std::cout << "max number: " << *std::max_element(randomNumbers.begin(), randomNumbers.end()) << std::endl;
     //fill the input buffer with random numbers

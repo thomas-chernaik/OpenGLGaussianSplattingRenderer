@@ -19,6 +19,7 @@
 
 
 
+
 #ifndef DISS_SPLATS_H
 #define DISS_SPLATS_H
 
@@ -47,7 +48,11 @@ class Splats
         void sort();
 
         //function to draw the splats
-        void draw(float* viewMatrix, float* projectionMatrix, float* lightPosition, float* lightColour, float* cameraPosition);
+        void draw(float *viewMatrix, float *projectionMatrix, float *lightPosition, float *lightColour,
+                  float *cameraPosition, int width, int height);
+
+        //function to display the splats
+        void display();
 
 
 
@@ -87,6 +92,7 @@ class Splats
         GLuint intermediateBuffer;
         GLuint histogramBuffer;
 
+
         //not used for now
         GLuint sphericalHarmonicsBuffer;
 
@@ -97,6 +103,12 @@ class Splats
         GLuint histogramProgram;
         GLuint prefixSumProgram;
         GLuint drawProgram;
+
+        //stuff for displaying
+        GLuint vao;
+        GLuint vbo;
+        GLuint displayProgram;
+        GLuint texture;
 
 
 

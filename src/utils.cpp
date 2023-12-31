@@ -84,6 +84,71 @@ void isSorted(float* buffer, int size) {
     std::cout << "Buffer is sorted" << std::endl;
 }
 
+//a function to load and link vertex and fragment shaders
+GLuint loadAndLinkShaders(std::string shaderName)
+{
+    std::cout << "compiling " << shaderName << " shaders" << std::endl;
+    //read vertex shader file
+    std::string vertexShaderCode = readShaderFile("shaders/" + shaderName + ".vert");
+    //read fragment shader file
+    std::string fragmentShaderCode = readShaderFile("shaders/" + shaderName + ".frag");
+
+    //create vertex shader
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    const char *vertexShaderCodePtr = vertexShaderCode.c_str();
+    glShaderSource(vertexShader, 1, &vertexShaderCodePtr, nullptr);
+    glCompileShader(vertexShader);
+
+    //check vertex shader compiled
+    GLint success;
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        // Compilation failed, print error log
+        char infoLog[512];
+        glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
+        std::cout << "Vertex shader compilation failed:\n" << infoLog << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    //create fragment shader
+    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    const char *fragmentShaderCodePtr = fragmentShaderCode.c_str();
+    glShaderSource(fragmentShader, 1, &fragmentShaderCodePtr, nullptr);
+    glCompileShader(fragmentShader);
+
+    //check fragment shader compiled
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        // Compilation failed, print error log
+        char infoLog[512];
+        glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
+        std::cout << "Fragment shader compilation failed:\n" << infoLog << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    //create program and attach shaders
+    GLuint program = glCreateProgram();
+    glAttachShader(program, vertexShader);
+    glAttachShader(program, fragmentShader);
+    glLinkProgram(program);
+
+    //check program linked
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (!success)
+    {
+        // Linking failed, print error log
+        char infoLog[512];
+        glGetProgramInfoLog(program, 512, nullptr, infoLog);
+        std::cout << "Shader linking failed:\n" << infoLog << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    std::cout << "compiled and linked " << shaderName << " shaders" << std::endl;
+    return program;
+}
+
 //function to load and link a shader
 GLuint loadAndLinkShader(std::string shaderName)
 {

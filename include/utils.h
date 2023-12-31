@@ -28,10 +28,15 @@ std::vector<float> createRandomNumbersFloat(int size);
 std::vector<int> createRandomNumbersInt(int size, int maxNumber);
 
 std::vector<glm::uvec2> createRandomNumbersVec2(int size, int maxNumber);
+
+
 //function to test a buffer is sorted;
 
 //function to load and link a shader
 GLuint loadAndLinkShader(std::string shaderName);
+
+GLuint loadAndLinkShaders(std::string shaderName);
+
 
 
 #endif //DISS_UTILS_H

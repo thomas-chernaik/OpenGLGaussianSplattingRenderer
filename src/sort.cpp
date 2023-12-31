@@ -181,7 +181,7 @@ void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sort
     glQueryCounter(startTimeQuery, GL_TIMESTAMP);
 
     //run the sort
-    for(int i=0; i<8; i++)
+    for(int i=0; i<7; i++)
     {
         //generate the histograms
         glUseProgram(histogramProgram);

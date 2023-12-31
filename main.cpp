@@ -67,7 +67,25 @@ int main()
 
     //draw splats
     std::cout << "Drawing splats" << std::endl;
-    splats.draw(nullptr, nullptr, nullptr, nullptr, nullptr);
+    splats.draw(nullptr, nullptr, nullptr, nullptr, nullptr, camera.getWidth(), camera.getHeight());
+
+    //display window
+    while (!glfwWindowShouldClose(window)) {
+        //clear window
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        //display splats
+        splats.display();
+        //swap buffers
+        glfwSwapBuffers(window);
+
+        //poll events
+        glfwPollEvents();
+        //check for escape key
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+            glfwSetWindowShouldClose(window, true);
+        }
+    }
 
     //close window
     glfwTerminate();

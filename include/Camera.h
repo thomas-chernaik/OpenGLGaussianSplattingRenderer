@@ -45,14 +45,14 @@ private:
     float aspect;
     float near;
     float far;
-    int width;
+    int width = 1080;
 public:
     int getWidth() const;
 
     int getHeight() const;
 
 private:
-    int height;
+    int height = 720;
 
 
 

@@ -3,6 +3,8 @@
 //
 
 #include "Splats.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 Splats::Splats(const std::string &filePath)
 {
@@ -29,6 +31,11 @@ Splats::~Splats()
     glDeleteProgram(sortProgram);
     glDeleteProgram(histogramProgram);
     glDeleteProgram(drawProgram);
+    glDeleteProgram(displayProgram);
+    //delete the vao and vbo
+    glDeleteVertexArrays(1, &vao);
+    glDeleteBuffers(1, &vbo);
+
 }
 
 void Splats::loadToGPU()
@@ -74,6 +81,41 @@ void Splats::loadToGPU()
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats  * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
+
+    //create the texture to display
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    //set the texture parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); //GL_NEAREST for no interpolation
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    //set the texture to be the same size as the screen
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1920, 1080, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    //unbind the texture
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    //create the vao and vbo for displaying
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+    //bind the vao and vbo
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    //a quad made of 2 triangles
+    std::vector<glm::vec3> vertices = {
+            {-1, -1, 0},
+            {1, -1, 0},
+            {1, 1, 0},
+            {1, 1, 0},
+            {-1, 1, 0},
+            {-1, -1, 0}
+    };
+    //load the vertices into the vbo
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), vertices.data(), GL_STATIC_DRAW);
+    //set the vertex attribute pointer
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+    glEnableVertexAttribArray(0);
+    //unbind the vao and vbo
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     std::cout << "Finished loading splats to GPU" << std::endl;
 
 }
@@ -88,6 +130,9 @@ void Splats::loadShaders()
     generateKeysProgram = loadAndLinkShader("duplicateKeys");
     //load the draw shader
     drawProgram = loadAndLinkShader("draw");
+    //load the display shaders
+    displayProgram = loadAndLinkShaders("renderTexture");
+
 }
 
 void Splats::loadSplats(const std::string &filePath)
@@ -296,7 +341,7 @@ void Splats::preprocess(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width,
     glDispatchCompute(numSplats / 256, 1, 1);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     std::cout << "Finished preprocessing splats" << std::endl;
-#ifndef DEBUG
+#ifdef DEBUG
     //print out the keys (buffer of vec2s)
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, keyBuffer);
     int numDupes = 0;
@@ -382,13 +427,123 @@ void Splats::duplicateKeys()
     GLuint* numDuplicatesData = (GLuint*)glMapBuffer(GL_ATOMIC_COUNTER_BUFFER, GL_READ_ONLY);
     std::cout << "num duplicates: " << numDuplicatesData[0] << std::endl;
     glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);
+
+    numSplatsPostCull = numSplats - numCulledData[0] + numDuplicatesData[0];
+    std::cout << "num splats post cull: " << numSplatsPostCull << std::endl;
 }
 
 void Splats::sort()
-{}
+{
+    std::cout << "Sorting splats" << std::endl;
+    double time = glfwGetTime();
+    GPURadixSort2(histogramProgram, prefixSumProgram, sortProgram, keyBuffer, indexBuffer, intermediateBuffer, histogramBuffer,
+                  numSplats * 2, 8, 256);
+    std::cout << "Finished sorting splats" << std::endl;
+    std::cout << "Time taken to sort: " << glfwGetTime() - time << std::endl;
 
-void Splats::draw(float *viewMatrix, float *projectionMatrix, float *lightPosition, float *lightColour, float *cameraPosition)
-{}
+}
+
+void Splats::draw(float *viewMatrix, float *projectionMatrix, float *lightPosition, float *lightColour,
+                  float *cameraPosition, int width, int height)
+{
+    //the draw function needs to following inputs:
+    //the start and end of each bin for each tile (this can be found at the end of the histogram buffer and the numSplatsPostCull)
+    //the buffer of projected means
+    //the buffer of projected covariance matrices
+    //the buffer of colours
+    //the screen dimensions
+#ifdef DEBUG
+    //set the texture on the cpu to white
+    std::vector<unsigned char> textureData(1920 * 1080 * 4, 255);
+    //bind the texture
+    glBindTexture(GL_TEXTURE_2D, texture);
+    //load the image
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, textureData.data());
+    //unbind the texture
+    glBindTexture(GL_TEXTURE_2D, 0);
+#endif
+
+    //and needs a screen sized buffer for the output
+    std::cout << "Drawing splats" << std::endl;
+    //bind the shader
+    glUseProgram(drawProgram);
+    //bind the buffers
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, histogramBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, projectedMeansBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, projectedCovarianceBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, coloursBuffer);
+    //bind the output screen sized buffer (a image2D)
+    glBindImageTexture(0, texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+    //set the uniforms
+    glUniform1i(glGetUniformLocation(drawProgram, "numSplats"), numSplatsPostCull);
+    glUniform1i(glGetUniformLocation(drawProgram, "screenWidth"), width);
+    glUniform1i(glGetUniformLocation(drawProgram, "screenHeight"), height);
+
+    //render the splats
+    glDispatchCompute(width / 16, height / 16, 1);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    std::cout << "Finished drawing splats" << std::endl;
+
+}
+
+void Splats::display()
+{
+    //the display function needs the following inputs:
+    //the vbo
+    //the texture to display
+
+#ifdef DEBUG
+    //load up an image from a file to texture
+    //bind the texture
+    glBindTexture(GL_TEXTURE_2D, texture);
+    //load the image
+    int w, h, nrChannels;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char *data = stbi_load("tex.png", &w, &h, &nrChannels, 0);
+    std::vector<unsigned char> textureData(width * height * 4, 255);
+
+    //check the image loaded correctly
+    if(!data)
+    {
+        std::cerr << "Error: failed to load image" << std::endl;
+        return;
+    }
+    GLenum format = (nrChannels == 3) ? GL_RGB : GL_RGBA;
+    //load the image into the texture
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, format, GL_UNSIGNED_BYTE, textureData.data());
+    //free the image data
+    stbi_image_free(data);
+    //unbind the texture
+    glBindTexture(GL_TEXTURE_2D, 0);
+#endif
+
+
+    //bind the shader
+    glUseProgram(displayProgram);
+    //bind the vao and vbo
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    //set the vertex attribute pointer
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+    glEnableVertexAttribArray(0);
+    //bind the texture
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); //GL_NEAREST for no interpolation
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    //wrapping
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER); //GL_CLAMP_TO_BORDER for no wrapping
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    //set the uniforms
+    glUniform1i(glGetUniformLocation(displayProgram, "tex"), 0);
+    //draw the texture
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    //unbind the vao and vbo
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    //unbind the texture
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
 
 void Splats::computeCovarianceMatrices()
 {
