@@ -44,8 +44,13 @@ class Splats
         //function to generate tile and depth based keys of splats
         void duplicateKeys();
 
+
+
         //function to sort the splats
         void sort();
+
+        //function to compute the bins of the splats
+        void computeBins();
 
         //function to draw the splats
         void draw(float *viewMatrix, float *projectionMatrix, float *lightPosition, float *lightColour,
@@ -91,6 +96,7 @@ class Splats
         GLuint keyBuffer;
         GLuint intermediateBuffer;
         GLuint histogramBuffer;
+        GLuint binsBuffer;
 
 
         //not used for now
@@ -103,6 +109,7 @@ class Splats
         GLuint histogramProgram;
         GLuint prefixSumProgram;
         GLuint drawProgram;
+        GLuint binProgram;
 
         //stuff for displaying
         GLuint vao;

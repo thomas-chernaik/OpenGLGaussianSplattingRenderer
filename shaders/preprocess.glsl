@@ -166,8 +166,6 @@ void main() {
     uint depthInt = uint(depth * 1000.0);
     //cap the depth to 20 bits. This allows us to do less passes for the sorting
     depthInt = clamp(depthInt, 0, 1048575);
-    //OPTIMISATION: we can store the tile index along with the depth because we have the bits spare
-    depthInt = depthInt | (keysToWrite << 20);
     //set the values
     keys.data[index] = uvec2(keysToWrite, depthInt);
     conicOpacities.data[index] = vec4(conic, opacity);

@@ -25,6 +25,14 @@ Splats::~Splats()
     glDeleteBuffers(1, &opacitiesBuffer);
     glDeleteBuffers(1, &indexBuffer);
     glDeleteBuffers(1, &keyBuffer);
+    glDeleteBuffers(1, &intermediateBuffer);
+    glDeleteBuffers(1, &histogramBuffer);
+    glDeleteBuffers(1, &CovarianceBuffer);
+    glDeleteBuffers(1, &projectedMeansBuffer);
+    glDeleteBuffers(1, &projectedCovarianceBuffer);
+    glDeleteBuffers(1, &binsBuffer);
+    //delete the texture
+    glDeleteTextures(1, &texture);
     //delete the shaders
     glDeleteProgram(preProcessProgram);
     glDeleteProgram(generateKeysProgram);
@@ -32,6 +40,7 @@ Splats::~Splats()
     glDeleteProgram(histogramProgram);
     glDeleteProgram(drawProgram);
     glDeleteProgram(displayProgram);
+    glDeleteProgram(binProgram);
     //delete the vao and vbo
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(1, &vbo);
@@ -81,6 +90,11 @@ void Splats::loadToGPU()
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats  * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
+
+    //bin buffer (buffer of uints, size 256)
+    glGenBuffers(1, &binsBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, binsBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, 256 * sizeof(int), nullptr, GL_STATIC_DRAW);
 
     //create the texture to display
     glGenTextures(1, &texture);
@@ -132,6 +146,8 @@ void Splats::loadShaders()
     drawProgram = loadAndLinkShader("draw");
     //load the display shaders
     displayProgram = loadAndLinkShaders("renderTexture");
+    //load the bin shader
+    binProgram = loadAndLinkShader("countBins");
 
 }
 
@@ -472,6 +488,7 @@ void Splats::draw(float *viewMatrix, float *projectionMatrix, float *lightPositi
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, projectedMeansBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, projectedCovarianceBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, coloursBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, indexBuffer);
     //bind the output screen sized buffer (a image2D)
     glBindImageTexture(0, texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
     //set the uniforms
@@ -584,4 +601,38 @@ glm::mat3x3 Splats::computeCovarianceMatrix(const glm::vec3 scale, const glm::ve
     glm::mat3x3 covarianceMatrix = transformationMatrix * glm::transpose(transformationMatrix);
     return covarianceMatrix;
 
+}
+
+void Splats::computeBins()
+{
+    //the bin shader needs the following inputs:
+    //the buffer of keys
+    //and the output:
+    //the atomic counter buffer of bins
+
+    //bind the shader
+    glUseProgram(binProgram);
+    //bind the buffers
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, keyBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, binsBuffer);
+    //initialise the bins to 0
+    std::vector<GLuint> zero(256, 0);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, binsBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, 256 * sizeof(GLuint), zero.data(), GL_DYNAMIC_DRAW);
+
+    //set the length of the array of keys
+    glUniform1i(glGetUniformLocation(binProgram, "length"), numSplatsPostCull);
+
+    //run the shader
+    glDispatchCompute(numSplats / 256, 1, 1);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_ATOMIC_COUNTER_BARRIER_BIT);
+#ifndef DEBUG
+    //print the bins
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, binsBuffer);
+    GLuint* bins = (GLuint*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    for(int i = 0; i < 256; i++)
+    {
+        std::cout << "bin " << i << ": " << bins[i] << std::endl;
+    }
+#endif
 }

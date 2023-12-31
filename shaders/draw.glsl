@@ -22,6 +22,11 @@ layout(std430, binding = 3) buffer Colour {
     vec4 data[];
 } colour;
 
+//index buffer
+layout(std430, binding = 4) buffer Indices {
+    int data[];
+} incides;
+
 //num splats uniform
 uniform layout(location = 0) int numSplats;
 //the offset to find the prefix sum in the histogram
@@ -42,7 +47,7 @@ void main() {
     //imageStore(outputImage, uv, vec4(1, 1, 1, 1));
     //imageStore(outputImage, uv, vec4(uv.x / float(screenWidth), uv.y / float(screenHeight), 0, 1));
     //get tile index from the work group index
-    int tileIndex = int(gl_WorkGroupID.x + gl_WorkGroupID.y * gl_NumWorkGroups.x);
+    int tileIndex = int(gl_WorkGroupID.x);
     //get the start and end index of the splats for this tile
     //the start index is at location offset + tileIndex + 1
     //the end index is at location offset + tileIndex + 2, or if it is the last tile, it is numSplats
@@ -56,13 +61,14 @@ void main() {
     //now we have the start and end index, we can loop through the splats, sample, and blend
     vec4 blendedColour = vec4(0, 0, 0, 0);
     for(int i = startIndex; i < endIndex; i++) {
+        int index = incides.data[i];
         //get the projected mean
-        vec2 projectedMean = projectedMeans.data[i];
+        vec2 projectedMean = projectedMeans.data[index];
         //get the vector from the pixel to the projected mean
         vec2 pixelToProjectedMean = projectedMean - vec2(uv);
         //sample the covariance matrix to get the opacity at this pixel
         //TODO: sample the covariance matrix
-        float power = -0.5 * (conicOpacities.data[i].x * pixelToProjectedMean.x * pixelToProjectedMean.x + conicOpacities.data[i].z * pixelToProjectedMean.y * pixelToProjectedMean.y) - conicOpacities.data[i].y * pixelToProjectedMean.x * pixelToProjectedMean.y;
+        float power = -0.5 * (conicOpacities.data[index].x * pixelToProjectedMean.x * pixelToProjectedMean.x + conicOpacities.data[index].z * pixelToProjectedMean.y * pixelToProjectedMean.y) - conicOpacities.data[index].y * pixelToProjectedMean.x * pixelToProjectedMean.y;
         if (power > 0) {
             continue;
         }
@@ -77,7 +83,7 @@ void main() {
         //calculate the alpha to blend with
         float alphaToBlend = alpha * remainingAlpha;
         //calculate the alpha to blend with the existing colour
-        blendedColour = blendedColour + vec4(colour.data[i].rgb * alphaToBlend, alphaToBlend);
+        blendedColour = blendedColour + vec4(colour.data[index].rgb * alphaToBlend, alphaToBlend);
         //if the blended colour is opaque, we can stop blending
         if(blendedColour.a >= 0.99) {
             break;
@@ -85,7 +91,9 @@ void main() {
     }
 
     //write the blended colour to the output image
-    imageStore(outputImage, uv, blendedColour);
-
+    //imageStore(outputImage, uv, blendedColour);
+    //debug output the number of splats for this pixel
+    float numSplatsFloat = float(endIndex - startIndex) / float(gl_NumWorkGroups.x * gl_NumWorkGroups.y);
+    imageStore(outputImage, uv, vec4(numSplatsFloat, numSplatsFloat, numSplatsFloat, 1));
 
 }

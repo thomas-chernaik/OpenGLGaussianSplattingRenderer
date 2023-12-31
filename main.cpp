@@ -65,15 +65,22 @@ int main()
     std::cout << "Sorting splats" << std::endl;
     splats.sort();
 
+    //compute bins
+    std::cout << "Computing bins" << std::endl;
+    splats.computeBins();
+
     //draw splats
     std::cout << "Drawing splats" << std::endl;
+    glBeginQuery(GL_TIME_ELAPSED, timerQuery);
     splats.draw(nullptr, nullptr, nullptr, nullptr, nullptr, camera.getWidth(), camera.getHeight());
+    glEndQuery(GL_TIME_ELAPSED);
+    glGetQueryObjectui64v(timerQuery, GL_QUERY_RESULT, &timeElapsed);
+    std::cout << "Drawing splats took " << timeElapsed / 1000000.0 << " milliseconds" << std::endl;
 
     //display window
     while (!glfwWindowShouldClose(window)) {
         //clear window
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
         //display splats
         splats.display();
         //swap buffers
