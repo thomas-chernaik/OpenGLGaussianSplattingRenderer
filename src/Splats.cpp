@@ -478,6 +478,7 @@ void Splats::draw(float *viewMatrix, float *projectionMatrix, float *lightPositi
     glUniform1i(glGetUniformLocation(drawProgram, "numSplats"), numSplatsPostCull);
     glUniform1i(glGetUniformLocation(drawProgram, "screenWidth"), width);
     glUniform1i(glGetUniformLocation(drawProgram, "screenHeight"), height);
+    glUniform1i(glGetUniformLocation(drawProgram, "histogramOffset"), 16 * 8 * 256);
 
     //render the splats
     glDispatchCompute(width / 16, height / 16, 1);
