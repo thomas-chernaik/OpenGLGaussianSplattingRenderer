@@ -26,8 +26,8 @@ void main() {
 
     //get the value at the index
     uint value = keysBuffer.data[index].x;
-    if(value > 255) return;
+    //if(value > 255) return;//we can assume this won't happen, but we can uncomment if we want to be safe
 
-    //increment the value at the index of the value
-    atomicAdd(binsBuffer.data[value], 1u);
+    //increment the bin at the value
+    atomicAdd(binsBuffer.data[value], 1);
 }
