@@ -110,6 +110,7 @@ class Splats
         GLuint prefixSumProgram;
         GLuint drawProgram;
         GLuint binProgram;
+        GLuint binPrefixSumProgram;
 
         //stuff for displaying
         GLuint vao;

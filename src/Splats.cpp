@@ -41,6 +41,8 @@ Splats::~Splats()
     glDeleteProgram(drawProgram);
     glDeleteProgram(displayProgram);
     glDeleteProgram(binProgram);
+    glDeleteProgram(prefixSumProgram);
+    glDeleteProgram(binPrefixSumProgram);
     //delete the vao and vbo
     glDeleteVertexArrays(1, &vao);
     glDeleteBuffers(1, &vbo);
@@ -148,6 +150,8 @@ void Splats::loadShaders()
     displayProgram = loadAndLinkShaders("renderTexture");
     //load the bin shader
     binProgram = loadAndLinkShader("countBins");
+    //load the bin prefix sum shader
+    binPrefixSumProgram = loadAndLinkShader("prefixBins");
 
 }
 
@@ -609,7 +613,9 @@ void Splats::computeBins()
     //the buffer of keys
     //and the output:
     //the atomic counter buffer of bins
-
+    std::cout << "Computing bins" << std::endl;
+    //start a timer
+    double time = glfwGetTime();
     //bind the shader
     glUseProgram(binProgram);
     //bind the buffers
@@ -625,8 +631,21 @@ void Splats::computeBins()
 
     //run the shader
     glDispatchCompute(numSplats / 256, 1, 1);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_ATOMIC_COUNTER_BARRIER_BIT);
-#ifndef DEBUG
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    //run the prefix sum on the bins
+    //bind the shader
+    glUseProgram(binPrefixSumProgram);
+    //bind the buffers
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, binsBuffer);
+    //run the shader
+    glDispatchCompute(1, 1, 1);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    std::cout << "Finished computing bins" << std::endl;
+#ifdef DEBUG
+    //sync the gpu
+    glFinish();
+    //print the time taken
+    std::cout << "Time taken to compute bins: " << glfwGetTime() - time << std::endl;
     //print the bins
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, binsBuffer);
     GLuint* bins = (GLuint*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);

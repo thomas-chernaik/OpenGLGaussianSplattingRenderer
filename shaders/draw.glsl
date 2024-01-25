@@ -1,7 +1,7 @@
 #version 430 core
 layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-//histogram buffer
+//bins buffer
 layout(std430, binding = 0) buffer Histogram {
     int data[];
 } histogram;

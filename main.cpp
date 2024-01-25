@@ -79,6 +79,8 @@ int main()
 
     //display window
     while (!glfwWindowShouldClose(window)) {
+        //resize window to camera size
+        glfwSetWindowSize(window, camera.getWidth(), camera.getHeight());
         //clear window
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         //display splats
