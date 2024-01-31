@@ -41,12 +41,13 @@ void main() {
         return;
     }
     //write the first splat key out (in place)
-    keys.data[index].x = keysToUnpack & 0xFF;
-    keys.data[index].y = depth | ((keysToUnpack & 0xFF) << 20);
+    keys.data[index].x = keysToUnpack & 0xFFu;
+    keys.data[index].y = depth | ((keysToUnpack & 0xFFu) << 20);
+    indices.data[index] = index;
     //work out the number of keys to unpack
     uint numKeysToUnpack = 1;
     for(uint i=1; i<3; i++) {
-        if((keysToUnpack & (0xFF << i*8)) != 0) {
+        if((keysToUnpack & (0xFFu << i*8)) != 0) {
             numKeysToUnpack++;
         }
     }
@@ -54,10 +55,10 @@ void main() {
     //this gets skipped if there is only one key to unpack
     for(uint i=1; i<numKeysToUnpack; i++) {
         //get the key
-        float keyToUnpack = (keysToUnpack >> (i*8)) & 0xFF;
+        uint keyToUnpack = (keysToUnpack >> (i*8)) & 0xFFu;
         uint keyIndex = atomicCounterIncrement(numDuplicatedSplats) + numKeys;
         //write the key out
-        keys.data[keyIndex] = uvec2(keyToUnpack, depth | ((keysToUnpack & 0xFF) << 20));
+        keys.data[keyIndex] = uvec2(keyToUnpack, depth | keyToUnpack << 20);
         //write the index out
         indices.data[keyIndex] = index;
     }

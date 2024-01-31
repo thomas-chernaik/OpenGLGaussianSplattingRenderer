@@ -450,21 +450,44 @@ void Splats::duplicateKeys()
 
     numSplatsPostCull = numSplats - numCulledData[0] + numDuplicatesData[0];
     std::cout << "num splats post cull: " << numSplatsPostCull << std::endl;
+
 }
 
 void Splats::sort()
 {
     std::cout << "Sorting splats" << std::endl;
     double time = glfwGetTime();
-    GPURadixSort2(histogramProgram, prefixSumProgram, sortProgram, keyBuffer, indexBuffer, intermediateBuffer, histogramBuffer,
-                  numSplats * 2, 8, 256);
+    GPURadixSort2(histogramProgram, prefixSumProgram, sortProgram, keyBuffer, intermediateBuffer, indexBuffer, histogramBuffer,
+                  numSplatsPostCull, 8, 256);
     std::cout << "Finished sorting splats" << std::endl;
     std::cout << "Time taken to sort: " << glfwGetTime() - time << std::endl;
+    //DEBUG: print the keys and indices
+    //load the keys and indices into vectors
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, keyBuffer);
+    glm::uvec2* keys = (glm::uvec2*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, indexBuffer);
+    int* indices = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    // convert them into vectors
+    std::vector<glm::uvec2> keysVec(keys, keys + numSplats * 2);
+    std::vector<int> indicesVec(indices, indices + numSplats * 2);
+    //get the projected means as a vector
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedMeansBuffer);
+    float* projectedMeans = (float*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    std::vector<float> projectedMeansVec(projectedMeans, projectedMeans + numSplats * 2);
+    //print the keys and indices
+    for(int i = 0; i < numSplats * 2; i++)
+    {
+        //std::cout << "key: " << keysVec[i][0] << " " << keysVec[i][1] << " index: " << indicesVec[i] << std::endl;
+        if(keysVec[i][0] != 10000 && keysVec[i][0] != 9999)
+        {
+            //std::cout << "projected mean: " << projectedMeansVec[i * 2] << " " << projectedMeansVec[i * 2 + 1] << std::endl;
+
+        }
+    }
 
 }
 
-void Splats::draw(float *viewMatrix, float *projectionMatrix, float *lightPosition, float *lightColour,
-                  float *cameraPosition, int width, int height)
+void Splats::draw(int width, int height)
 {
     //the draw function needs to following inputs:
     //the start and end of each bin for each tile (this can be found at the end of the histogram buffer and the numSplatsPostCull)
@@ -488,7 +511,7 @@ void Splats::draw(float *viewMatrix, float *projectionMatrix, float *lightPositi
     //bind the shader
     glUseProgram(drawProgram);
     //bind the buffers
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, histogramBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, binsBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, projectedMeansBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, projectedCovarianceBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, coloursBuffer);
@@ -499,7 +522,6 @@ void Splats::draw(float *viewMatrix, float *projectionMatrix, float *lightPositi
     glUniform1i(glGetUniformLocation(drawProgram, "numSplats"), numSplatsPostCull);
     glUniform1i(glGetUniformLocation(drawProgram, "screenWidth"), width);
     glUniform1i(glGetUniformLocation(drawProgram, "screenHeight"), height);
-    glUniform1i(glGetUniformLocation(drawProgram, "histogramOffset"), 16 * 8 * 256);
 
     //render the splats
     glDispatchCompute(width / 16, height / 16, 1);
@@ -630,7 +652,7 @@ void Splats::computeBins()
     glUniform1i(glGetUniformLocation(binProgram, "length"), numSplatsPostCull);
 
     //run the shader
-    glDispatchCompute(numSplats / 256, 1, 1);
+    glDispatchCompute(numSplatsPostCull / 256, 1, 1);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     //run the prefix sum on the bins
     //bind the shader
@@ -654,4 +676,39 @@ void Splats::computeBins()
         std::cout << "bin " << i << ": " << bins[i] << std::endl;
     }
 #endif
+}
+
+void Splats::printProjectedMeans()
+{
+    //load the projected means from the gpu
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedMeansBuffer);
+    float* projectedMeans = (float*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    //print the projected means
+    for(int i = 0; i < 50000; i++)
+    {
+        std::cout << "Projected mean " << i << ": " << projectedMeans[i * 2] << ", " << projectedMeans[i * 2 + 1] << std::endl;
+    }
+}
+
+void Splats::printProjectedMeansByIndex()
+{
+    //get the indices
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, indexBuffer);
+    int* indices = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    //get the projected means
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedMeansBuffer);
+    float* projectedMeans = (float*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    //get the keys
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, keyBuffer);
+    glm::uvec2* keys = (glm::uvec2*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    std::cout << "hskdjhfksdhjf" << std::endl;
+    //print the projected means
+    for(int i = 0; i < numSplatsPostCull; i++)
+    {
+        int index = indices[i];
+        //std::cout << "Projected mean " << index << ": " << projectedMeans[index * 2] << ", " << projectedMeans[index * 2 + 1] << std::endl;
+        std::cout << "Key " << index << ": " << keys[index][0] << ", " << keys[index][1] << std::endl;
+        //if input x, end function
+
+    }
 }

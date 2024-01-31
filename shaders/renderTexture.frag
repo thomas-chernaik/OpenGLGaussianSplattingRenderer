@@ -8,6 +8,5 @@ out vec3 color;
 
 void main()
 {
-    //color = texture(tex, texCoord).rgb;
-    color = vec4(1.0).rgb;
+    color = texture(tex, texCoord).rgb;
 }

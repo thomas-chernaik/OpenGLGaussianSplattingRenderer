@@ -37,7 +37,7 @@ int main()
 
 
     //initialise camera
-    Camera camera(0.0f, 0.0f, -10.0f);
+    Camera camera(3.0f, 4.0f, -3.0f);
     camera.update();
 
     Splats splats("models/point_cloud.ply");
@@ -47,6 +47,7 @@ int main()
     std::cout << "Preprocessing splats" << std::endl;
 
     splats.preprocess( camera.getProjectionMatrix() * camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
+    //DEBUG: output the projected means
 
     //duplicate splats
     //start timer query
@@ -60,19 +61,22 @@ int main()
     GLuint64 timeElapsed;
     glGetQueryObjectui64v(timerQuery, GL_QUERY_RESULT, &timeElapsed);
     std::cout << "Duplicating splats took " << timeElapsed / 1000000.0 << " milliseconds" << std::endl;
-
+    std::cout << "Projected means" << std::endl;
+    //splats.printProjectedMeansByIndex();
     //sort splats
     std::cout << "Sorting splats" << std::endl;
     splats.sort();
+    //splats.printProjectedMeansByIndex();
 
     //compute bins
     std::cout << "Computing bins" << std::endl;
     splats.computeBins();
 
+
     //draw splats
     std::cout << "Drawing splats" << std::endl;
     glBeginQuery(GL_TIME_ELAPSED, timerQuery);
-    splats.draw(nullptr, nullptr, nullptr, nullptr, nullptr, camera.getWidth(), camera.getHeight());
+    splats.draw(camera.getWidth(), camera.getHeight());
     glEndQuery(GL_TIME_ELAPSED);
     glGetQueryObjectui64v(timerQuery, GL_QUERY_RESULT, &timeElapsed);
     std::cout << "Drawing splats took " << timeElapsed / 1000000.0 << " milliseconds" << std::endl;

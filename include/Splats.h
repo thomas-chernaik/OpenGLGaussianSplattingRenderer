@@ -53,8 +53,7 @@ class Splats
         void computeBins();
 
         //function to draw the splats
-        void draw(float *viewMatrix, float *projectionMatrix, float *lightPosition, float *lightColour,
-                  float *cameraPosition, int width, int height);
+        void draw(int width, int height);
 
         //function to display the splats
         void display();
@@ -118,7 +117,13 @@ class Splats
         GLuint displayProgram;
         GLuint texture;
 
+    //Debug functions
+public:
 
+    //function to print the splats's projected means
+    void printProjectedMeans();
+    //function to print the splat's projected means in order of indices
+    void printProjectedMeansByIndex();
 
 };
 

@@ -1,7 +1,6 @@
 #version 430 core
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-//the members here aren't called data because it gave me an error I have no clue why?
 //inputs
 //means3D
 layout(std430, binding = 0) buffer Means3D
@@ -115,6 +114,9 @@ void main() {
     float eigenvalue2 = mid - sqrt(max(0.1, mid * mid - determinant));
     //calculate the radius of the splat, 3 is a magic number that seems to work well
     float radius = ceil(3. * sqrt(max(eigenvalue1, eigenvalue2)));
+    //TODO: put the radius back
+    //radius = 0 so we get no duplicates
+    radius = 0;
     //convert the projected mean to pixel space
     vec2 projectedMeanPixelSpace = vec2(normalisedSpaceToPixelSpace(projectedMean.x, width), normalisedSpaceToPixelSpace(projectedMean.y, height));
     //calculate the bounding box
@@ -163,11 +165,14 @@ void main() {
         return;
     }
     //convert the depth to an integer
-    uint depthInt = uint(depth * 1000.0);
+    uint depthInt = uint(depth * 10000.0);
     //cap the depth to 20 bits. This allows us to do less passes for the sorting
     depthInt = clamp(depthInt, 0, 1048575);
+    //TODO: fix this later
+    // To Debug I'm going to just have one tile per splat
+    uint tileIndex = uint(int(projectedMeanPixelSpace.x)/widthDiv16) + uint(int(projectedMeanPixelSpace.y)/heightDiv16) * 16;
     //set the values
-    keys.data[index] = uvec2(keysToWrite, depthInt);
+    keys.data[index] = uvec2(tileIndex, depthInt);
     conicOpacities.data[index] = vec4(conic, opacity);
     projectedMeans.data[index] = projectedMeanPixelSpace;
 
