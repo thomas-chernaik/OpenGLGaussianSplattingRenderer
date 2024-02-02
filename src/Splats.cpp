@@ -865,6 +865,14 @@ glm::vec3 Splats::get2DCovariance(glm::mat3 covarianceMatrix, glm::vec3 projecte
 
 void Splats::simplifiedDraw(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height)
 {
+    //clear the texture
+    std::vector<unsigned char> textureData(width * height * 4, 255);
+    //bind the texture
+    glBindTexture(GL_TEXTURE_2D, texture);
+    //load the image
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, textureData.data());
+    //unbind the texture
+    glBindTexture(GL_TEXTURE_2D, 0);
     //bind the shader
     glUseProgram(simplifiedDrawProgram);
     //bind the buffers
@@ -894,7 +902,6 @@ void Splats::simplifiedDraw(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int wi
     {
         std::cerr << "Error: " << error << std::endl;
     }
-    std::cout << "Finished simplified drawing" << std::endl;
 
 
 }

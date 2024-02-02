@@ -1,6 +1,8 @@
 //
 // Created by thomas on 28/12/23.
 //
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -23,6 +25,7 @@ public:
     void rotateRight(float angle);
     void rotateUp(float angle);
     void rotateDown(float angle);
+    void getInput(GLFWwindow* window);
 
     glm::mat4 getViewMatrix();
     glm::mat4 getProjectionMatrix();

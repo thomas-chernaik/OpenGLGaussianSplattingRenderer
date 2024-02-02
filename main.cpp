@@ -94,6 +94,7 @@ int main()
         splats.display();
         //swap buffers
         glfwSwapBuffers(window);
+        camera.getInput(window);
 
         //poll events
         glfwPollEvents();
