@@ -9,4 +9,6 @@ out vec3 color;
 void main()
 {
     color = texture(tex, texCoord).rgb;
+
+    //color = vec3(texCoord.x, texCoord.y, 0.0);
 }

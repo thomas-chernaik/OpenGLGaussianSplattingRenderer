@@ -151,16 +151,119 @@ def load_ply(path):
     shs = shs.astype(np.float32)
     return GaussianData(xyz, rots, scales, opacities, shs)
 
-data = load_ply("models/point_cloud.ply")
-# Lets write into a file for a test the raw data to later read in c++
-with open("models/test/means.bin", "wb+") as f:
-    f.write(data.xyz.tobytes())
-with open("models/test/rot.bin", "wb+") as f:
-    f.write(data.rot.tobytes())
-with open("models/test/scale.bin", "wb+") as f:
-    f.write(data.scale.tobytes())
-with open("models/test/opacity.bin", "wb+") as f:
-    f.write(data.opacity.tobytes())
-with open("models/test/sh.bin", "wb+") as f:
-    f.write(data.sh.tobytes())
 
+def save_ply(path, means, rotations, scales, opacities, colours):
+    numSplats = len(means)
+    header = f"""ply
+format binary_little_endian 1.0
+element vertex {numSplats}
+property float x
+property float y
+property float z
+property float nx
+property float ny
+property float nz
+property float f_dc_0
+property float f_dc_1
+property float f_dc_2
+property float f_rest_0
+property float f_rest_1
+property float f_rest_2
+property float f_rest_3
+property float f_rest_4
+property float f_rest_5
+property float f_rest_6
+property float f_rest_7
+property float f_rest_8
+property float f_rest_9
+property float f_rest_10
+property float f_rest_11
+property float f_rest_12
+property float f_rest_13
+property float f_rest_14
+property float f_rest_15
+property float f_rest_16
+property float f_rest_17
+property float f_rest_18
+property float f_rest_19
+property float f_rest_20
+property float f_rest_21
+property float f_rest_22
+property float f_rest_23
+property float f_rest_24
+property float f_rest_25
+property float f_rest_26
+property float f_rest_27
+property float f_rest_28
+property float f_rest_29
+property float f_rest_30
+property float f_rest_31
+property float f_rest_32
+property float f_rest_33
+property float f_rest_34
+property float f_rest_35
+property float f_rest_36
+property float f_rest_37
+property float f_rest_38
+property float f_rest_39
+property float f_rest_40
+property float f_rest_41
+property float f_rest_42
+property float f_rest_43
+property float f_rest_44
+property float opacity
+property float scale_0
+property float scale_1
+property float scale_2
+property float rot_0
+property float rot_1
+property float rot_2
+property float rot_3
+end_header
+"""
+    # open file
+    file = open(path, "wb")
+    file.write(bytearray(header, "utf-8"))
+    normal = np.zeros(3, dtype=np.float32)
+    sphericalHarmonic = np.zeros(45, dtype=np.float32)
+
+    # For each splat, write the data
+    for i in range(numSplats):
+        # Write the mean
+        file.write(means[i].tobytes())
+        # Write out 3 float zeros for the normal
+        file.write(normal.tobytes())
+        # Write out the colour
+        file.write(colours[i].tobytes())
+        #write out 45 zeros for the SH
+        file.write(sphericalHarmonic.tobytes())
+        # convert the opacity to logit scale
+        opacityConverted = (np.log(opacities[i] / (1 - opacities[i]))).astype('<f4')
+        file.write(opacityConverted.tobytes())
+        # Convert the scale to log scale
+        scaleConverted = (np.log(scales[i])).astype('<f4')
+        file.write(scaleConverted.tobytes())
+        # Write out the rotation
+        file.write(rotations[i].tobytes())
+
+    file.close()
+
+# Lets create a simple example with 1 splat
+means = np.array([[0, 0, 0]], dtype=np.float32)
+# rotation identity
+rotations = np.array([[0, 0, 0, 1]], dtype=np.float32)
+# scale 1, 1, 1
+scales = np.array([[1, 1, 1]], dtype=np.float32)
+# opacity 1
+opacities = np.array([1], dtype=np.float32)
+# color white
+colours = np.array([[1, 1, 1]], dtype=np.float32)
+# Save the ply file
+save_ply("models/testSingleItem.ply", means, rotations, scales, opacities, colours)
+
+# lets read it back to check it worked
+data = load_ply("models/testSingleItem.ply")
+#compare the data
+assert np.all(data.xyz == means)
+assert np.all(data.rot == rotations)
+assert np.all(data.scale == scales)

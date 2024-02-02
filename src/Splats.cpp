@@ -154,6 +154,8 @@ void Splats::loadShaders()
     binProgram = loadAndLinkShader("countBins");
     //load the bin prefix sum shader
     binPrefixSumProgram = loadAndLinkShader("prefixBins");
+    //load the simplified draw shader
+    simplifiedDrawProgram = loadAndLinkShader("simplifiedVersion");
 
 }
 
@@ -860,3 +862,39 @@ glm::vec3 Splats::get2DCovariance(glm::mat3 covarianceMatrix, glm::vec3 projecte
     return glm::vec3(covarianceMatrix2D[0][0], covarianceMatrix2D[0][1], covarianceMatrix2D[1][1]);
 }
 
+
+void Splats::simplifiedDraw(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height)
+{
+    //bind the shader
+    glUseProgram(simplifiedDrawProgram);
+    //bind the buffers
+    //buffer 0 means
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, projectedMeansBuffer);
+    //buffer 1 opacities
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, opacitiesBuffer);
+    //buffer 2 3D covariance matrices
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, CovarianceBuffer);
+
+    //set the uniforms
+    glUniformMatrix4fv(glGetUniformLocation(simplifiedDrawProgram, "vpMatrix"), 1, GL_FALSE, &vpMatrix[0][0]);
+    glUniformMatrix3fv(glGetUniformLocation(simplifiedDrawProgram, "rotationMatrix"), 1, GL_FALSE, &rotationMatrix[0][0]);
+    glUniform1i(glGetUniformLocation(simplifiedDrawProgram, "numSplats"), numSplats);
+    glUniform1i(glGetUniformLocation(simplifiedDrawProgram, "width"), width);
+    glUniform1i(glGetUniformLocation(simplifiedDrawProgram, "height"), height);
+
+    //set the output texture
+    glBindImageTexture(0, texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+
+    //run the shader
+    glDispatchCompute(1, 1,  1);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    //check for errors
+    GLenum error = glGetError();
+    if(error != GL_NO_ERROR)
+    {
+        std::cerr << "Error: " << error << std::endl;
+    }
+    std::cout << "Finished simplified drawing" << std::endl;
+
+
+}

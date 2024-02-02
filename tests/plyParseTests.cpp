@@ -100,6 +100,10 @@ TEST(SplatsTest, LoadFile)
             ASSERT_FLOAT_EQ(splats.rotations[i][j], rotations[i][j]);
         }
     }
+}
 
-
+TEST(SplatsTest, LoadSimplePly)
+{
+    Splats splats("models/testSingleItem.ply");
+    ASSERT_EQ(splats.numSplats, 1);
 }

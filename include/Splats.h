@@ -115,6 +115,9 @@ class Splats
         GLuint binProgram;
         GLuint binPrefixSumProgram;
 
+        //simplified draw program
+        GLuint simplifiedDrawProgram;
+
         //stuff for displaying
         GLuint vao;
         GLuint vbo;
@@ -131,6 +134,7 @@ public:
 
     void cpuRender(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height);
     void cpuProjectSplats(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height);
+    void simplifiedDraw(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height);
     std::vector<glm::vec2> projectedMeans;
     std::vector<float> depthBuffer;
     std::vector<std::vector<glm::vec4>> image;

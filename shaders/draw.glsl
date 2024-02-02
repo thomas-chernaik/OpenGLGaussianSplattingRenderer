@@ -41,8 +41,8 @@ void main() {
     //get global UV coordinates
     ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
     //debug for now, output the white to the pixel
-    //imageStore(outputImage, uv, vec4(1, 1, 1, 1));
-    //return;
+    imageStore(outputImage, uv, vec4(1, 1, 1, 1));
+    return;
     //imageStore(outputImage, uv, vec4(uv.x / float(screenWidth), uv.y / float(screenHeight), 0, 1));
     //get tile index from the pixel position, width and height
     //there are 16x16 tiles
