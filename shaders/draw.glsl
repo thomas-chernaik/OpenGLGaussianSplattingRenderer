@@ -73,7 +73,8 @@ void main() {
         //get the vector from the pixel to the projected mean
         vec2 pixelToProjectedMean = projectedMean - vec2(uv.x, uv.y);
         //normalise the vector by dividing by the screen width and height
-        pixelToProjectedMean = pixelToProjectedMean / vec2(screenWidth, screenHeight);
+        //pixelToProjectedMean = vec2(pixelToProjectedMean.x / float(screenWidth), pixelToProjectedMean.y / float(screenHeight));
+        pixelToProjectedMean *= 5;
         //sample the covariance matrix to get the opacity at this pixel
         //TODO: sample the covariance matrix//DEBUG: increment the counter
         float power = -0.5 * (conicOpacities.data[index].x * pixelToProjectedMean.x * pixelToProjectedMean.x + conicOpacities.data[index].z * pixelToProjectedMean.y * pixelToProjectedMean.y) - conicOpacities.data[index].y * pixelToProjectedMean.x * pixelToProjectedMean.y;
@@ -82,10 +83,7 @@ void main() {
         }
         //multiply the gaussian opacity with the regular opacity
         float alpha = min(0.99, exp(power) * conicOpacities.data[index].w);
-        alpha = conicOpacities.data[index].w;
-        if(abs(pixelToProjectedMean.x) > 1 || abs(pixelToProjectedMean.y) > 1) {
-            continue;
-        }
+        //alpha = conicOpacities.data[index].w;
         //skip if the calculated opacity is less than 0.01
         if (alpha < 0.01) {
             continue;
@@ -130,7 +128,8 @@ void main() {
     blendedColour = blendedColour / 255.0;
     blendedColour.a = alpha;
     //write the blended colour to the output image
-    imageStore(outputImage, uv, blendedColour2 / (255.0));
+    imageStore(outputImage, uv, blendedColour);
+    //imageStore(outputImage, uv, blendedColour2 / (255.0));
     //imageStore(outputImage, uv, vec4(counter2f, counter2f, counter2f, 1));
     //debug output the number of splats for this pixel
     //float numSplatsFloat = float(endIndex - startIndex) / 10000.;

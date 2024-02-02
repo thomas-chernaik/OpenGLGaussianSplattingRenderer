@@ -37,11 +37,11 @@ int main()
 
 
     //initialise camera
-    Camera camera(3.0f, 4.0f, -3.0f);
+    Camera camera(0.0f, 0.0f, -10.0f);
     camera.update();
 
     Splats splats("models/point_cloud.ply");
-
+    //splats.cpuRender(camera.getProjectionMatrix() * camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
     //render image
     //preprocess splats
     std::cout << "Preprocessing splats" << std::endl;

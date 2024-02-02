@@ -5,6 +5,8 @@
 #include "Splats.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 Splats::Splats(const std::string &filePath)
 {
@@ -291,7 +293,7 @@ void Splats::loadSplats(const std::string &filePath)
         float opacity;
         file.read((char *) &opacity, sizeof(float));
         //(1 / (1 + Math.exp(-rawVertex['opacity']))) * 255;
-        opacity = (1/(1+exp(-opacity))) * 255;
+        opacity = (1/(1+exp(-opacity)));
         //increase count if opacity less than 1
         if(opacity < 1)
         {
@@ -301,11 +303,22 @@ void Splats::loadSplats(const std::string &filePath)
         //read the scale
         float scale[3];
         file.read((char *) scale, sizeof(float) * 3);
+        // do exp(scale) to get the scale
+        for(int i=0; i<3; i++)
+        {
+            scale[i] = exp(scale[i]);
+        }
         glm::vec3 scaleVec(scale[0], scale[1], scale[2]);
         scales.push_back(scaleVec);
         //read the rotation
         float rotation[4];
         file.read((char *) rotation, sizeof(float) * 4);
+        // normalise the rotation
+        float length = sqrt(rotation[0] * rotation[0] + rotation[1] * rotation[1] + rotation[2] * rotation[2] + rotation[3] * rotation[3]);
+        rotation[0] /= length;
+        rotation[1] /= length;
+        rotation[2] /= length;
+        rotation[3] /= length;
         glm::vec4 rotationVec(rotation[0], rotation[1], rotation[2], rotation[3]);
         rotations.push_back(rotationVec);
 
@@ -712,3 +725,138 @@ void Splats::printProjectedMeansByIndex()
 
     }
 }
+
+
+void saveImage(const std::vector<std::vector<glm::vec4>>& image, const std::string& filename) {
+    int width = image.size();
+    int height = image[0].size();
+
+    std::vector<unsigned char> pixels(width * height * 4);
+
+    for (int h = 0; h < height; ++h) {
+        for (int w = 0; w < width; ++w) {
+            glm::vec4 color = image[w][h];
+            // Convert color from [0, 1] to [0, 255]
+            //color *= 255.0f;
+
+            int index = (h * width + w) * 4;
+            pixels[index + 0] = static_cast<unsigned char>(color.r);
+            pixels[index + 1] = static_cast<unsigned char>(color.g);
+            pixels[index + 2] = static_cast<unsigned char>(color.b);
+            pixels[index + 3] = static_cast<unsigned char>(color.a * 255);
+        }
+    }
+
+    stbi_write_png(filename.c_str(), width, height, 4, pixels.data(), width * 4);
+}
+
+void Splats::cpuRender(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height)
+{
+    //create the image to render to, as a 2D vector of vec4s
+    std::vector<std::vector<glm::vec4>> image(width, std::vector<glm::vec4>(height, glm::vec4(0, 0, 0, 0)));
+    //create a depth buffer, as a vector of floats, one for each splat
+    depthBuffer = std::vector<float>(numSplats);
+    //create a vector of the projected means, one for each splat
+    projectedMeans = std::vector<glm::vec2>(numSplats);
+    //create a vector of the conics, one for each splat
+    conics = std::vector<glm::vec3>(numSplats);
+    cpuProjectSplats(vpMatrix, rotationMatrix, width, height);
+    //sort the splats by depth
+    std::vector<int> indices(numSplats);
+    std::iota(indices.begin(), indices.end(), 0);
+    std::sort(indices.begin(), indices.end(), [&](int a, int b) { return depthBuffer[a] < depthBuffer[b]; });
+    int count = 0;
+    //for each pixel in the image
+    for(int h=0; h<height; h++)
+    {
+        for(int w=0; w<width; w++)
+        {
+            //convert the pixel to clip space
+            glm::vec2 pixel = glm::vec2((w / (float)width) * 2 - 1, (h / (float)height) * 2 - 1);
+            glm::vec4 blendedColour = glm::vec4(0, 0, 0, 0);
+            //for each splat
+            for(int i=0; i<numSplats; i++)
+            {
+                //get the index of the splat
+                int index = i;
+                //get the projected mean of the splat
+                glm::vec2 projectedMean = projectedMeans[index];
+                //get the distance from the pixel to the projected mean
+                float distance = glm::distance(pixel, projectedMean);
+                glm::vec2 pixelToProjectedMean = pixel - projectedMean;
+                /*
+                pixelToProjectedMean *= 100;
+                //sample the conic
+                float power = -0.5 * (conics[index].x * pixelToProjectedMean.x * pixelToProjectedMean.x + conics[i].z * pixelToProjectedMean.y * pixelToProjectedMean.y) - conics[index].y * pixelToProjectedMean.x * pixelToProjectedMean.y;
+                if (power > 0)
+                    continue;
+                float alpha = std::min(0.99f, exp(power) * opacities[index]);
+                //blend the colour
+                float remainingAlpha = 1 - blendedColour.a;
+                float alphaToBlend = alpha * remainingAlpha;
+                blendedColour = blendedColour + glm::vec4 (alphaToBlend * colours[index], alphaToBlend);
+                //if the alpha is 1, stop blending
+                if(blendedColour.a >= 0.99f)
+                {
+                    break;
+                }*/
+                if(distance < 0.01)
+                {
+                    blendedColour = glm::vec4(colours[index], opacities[index]);
+                }
+
+
+            }
+            //save the pixel to the image
+            image[w][h] = blendedColour;
+            count = 0;
+        }
+    }
+    //store the image in a png
+    saveImage(image, "cpuRender.png");
+
+}
+
+void Splats::cpuProjectSplats(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height)
+{
+    //for each splat, project the mean and then the 3d covariance matrix
+    for(int i = 0; i < numSplats; i++)
+    {
+        //project the mean
+        glm::vec4 projectedMean = vpMatrix * glm::vec4(means3D[i], 1);
+        //divide by w
+        projectedMean /= fmax(projectedMean[3], 0.0001f);
+        //convert to screen space
+        projectedMean = (projectedMean + 1.f) * 0.5f;
+        //store the projected mean
+        projectedMeans[i] = glm::vec2(projectedMean[0], projectedMean[1]);
+        //store the depth
+        depthBuffer[i] = projectedMean[2];
+        //project the 3d covariance matrix
+        glm::vec3 covariance2D = get2DCovariance(glm::mat3(covarianceMatrices[i][0], covarianceMatrices[i][1], covarianceMatrices[i][2],
+                                                           covarianceMatrices[i][1], covarianceMatrices[i][3], covarianceMatrices[i][4],
+                                                           covarianceMatrices[i][2], covarianceMatrices[i][4], covarianceMatrices[i][5]),
+                                                 projectedMean, rotationMatrix);
+        float determinant = covariance2D[0] * covariance2D[2] - covariance2D[1] * covariance2D[1];
+        float inverseDeterminant = 1.f / determinant;
+        glm::vec3 conic = glm::vec3(covariance2D[2], -covariance2D[1], covariance2D[0]) * inverseDeterminant;
+        //store the conic
+        conics[i] = conic;
+    }
+}
+
+glm::vec3 Splats::get2DCovariance(glm::mat3 covarianceMatrix, glm::vec3 projectedMean, glm::mat3 rotationMatrix)
+{
+    float lPrime = length(projectedMean);
+    glm::mat3 jacobian = glm::mat3(
+            1/projectedMean.z, 0, -projectedMean.x/(projectedMean.z*projectedMean.z),
+            0, 1/projectedMean.z, -projectedMean.y/(projectedMean.z*projectedMean.z),
+            0,0,0);
+    glm::mat3x3 covarianceMatrix2D = jacobian * rotationMatrix * covarianceMatrix * glm::transpose(rotationMatrix) * glm::transpose(jacobian);
+
+    //apply low pass filter
+    covarianceMatrix2D[0][0] += 0.3;
+    covarianceMatrix2D[1][1] += 0.3;
+    return glm::vec3(covarianceMatrix2D[0][0], covarianceMatrix2D[0][1], covarianceMatrix2D[1][1]);
+}
+

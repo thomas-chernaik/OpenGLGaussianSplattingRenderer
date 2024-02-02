@@ -3,6 +3,7 @@
 //
 #include <GL/glew.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <stdlib.h>
 #include <string>
 #include <vector>
@@ -13,6 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <bitset>
+
 
 #include "sort.h"
 #include "utils.h"
@@ -58,6 +60,16 @@ class Splats
         //function to display the splats
         void display();
 
+        int numSplats;
+        int numSplatsPostCull;
+        std::vector<glm::vec3> means3D;
+        std::vector<glm::vec3> colours;
+        std::vector<float> sphericalHarmonics;
+        std::vector<float> opacities;
+        std::vector<glm::vec3> scales;
+        std::vector<glm::vec4> rotations;
+        std::vector<std::array<float, 6>> covarianceMatrices;
+
 
 
     private:
@@ -69,15 +81,7 @@ class Splats
         glm::mat3x3 computeCovarianceMatrix(const glm::vec3 scale, const glm::vec4 rotation);
 
 
-        int numSplats;
-        int numSplatsPostCull;
-        std::vector<glm::vec3> means3D;
-        std::vector<glm::vec3> colours;
-        std::vector<float> sphericalHarmonics;
-        std::vector<float> opacities;
-        std::vector<glm::vec3> scales;
-        std::vector<glm::vec4> rotations;
-        std::vector<std::array<float, 6>> covarianceMatrices;
+
 
         int workGroupSize;
         int numWorkGroups;
@@ -125,6 +129,13 @@ public:
     //function to print the splat's projected means in order of indices
     void printProjectedMeansByIndex();
 
+    void cpuRender(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height);
+    void cpuProjectSplats(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height);
+    std::vector<glm::vec2> projectedMeans;
+    std::vector<float> depthBuffer;
+    std::vector<std::vector<glm::vec4>> image;
+    std::vector<glm::vec3> conics;
+    glm::vec3 get2DCovariance(glm::mat3 covarianceMatrix, glm::vec3 projectedMean, glm::mat3 rotationMatrix);
 };
 
 
