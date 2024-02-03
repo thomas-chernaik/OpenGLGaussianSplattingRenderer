@@ -37,13 +37,13 @@ int main()
 
 
     //initialise camera
-    Camera camera(0.5f, 0.0f, -20.0f);
+    Camera camera(0.0f, 0.0f, -20.0f);
     camera.update();
 
     Splats splats("models/testSingleItem.ply");
-    splats.simplifiedDraw(camera.getProjectionMatrix() * camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
+    //splats.simplifiedDraw(camera.getProjectionMatrix() * camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
     //splats.cpuRender(camera.getProjectionMatrix() * camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
-    /*
+
     //render image
     //preprocess splats
     std::cout << "Preprocessing splats" << std::endl;
@@ -82,7 +82,7 @@ int main()
     glEndQuery(GL_TIME_ELAPSED);
     glGetQueryObjectui64v(timerQuery, GL_QUERY_RESULT, &timeElapsed);
     std::cout << "Drawing splats took " << timeElapsed / 1000000.0 << " milliseconds" << std::endl;
-*/
+
     //display window
     while (!glfwWindowShouldClose(window)) {
         //resize window to camera size
@@ -90,11 +90,11 @@ int main()
         //clear window
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         //display splats
-        splats.simplifiedDraw(camera.getProjectionMatrix() * camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
+        //splats.simplifiedDraw(camera.getProjectionMatrix() * camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
         splats.display();
         //swap buffers
         glfwSwapBuffers(window);
-        camera.getInput(window);
+        //camera.getInput(window);
 
         //poll events
         glfwPollEvents();

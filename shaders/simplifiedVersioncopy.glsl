@@ -88,7 +88,6 @@ void main()
     float eigenvalue2 = mid - sqrt(max(0.1, mid * mid - determinant));
     //calculate the radius of the splat, 3 is a magic number that seems to work well
     float radius = ceil(3. * sqrt(max(eigenvalue1, eigenvalue2)));
-    radius = max(radius, 10);
     radius = 10;
     //screenCoords = vec2(100, 100);
 
@@ -102,12 +101,8 @@ void main()
             {
                 continue;
             }
-            //compute the opacity from the conic
-            float power = -0.5 * (conic.x * (x - screenCoords.x) * (x - screenCoords.x)  + conic.z * (y - screenCoords.y) * (y - screenCoords.y) ) - conic.y * (x - screenCoords.x) * (y - screenCoords.y);
-            float alpha = min(0.99, exp(power) * opacities.data[index]);
-            //alpha = 1;
             // draw the pixel
-            imageStore(outputImage, ivec2(x, y), vec4(alpha, 0.0, 0.0, alpha));
+            imageStore(outputImage, ivec2(x, y), vec4(1.0, 0.0, 0.0, 1.0));
         }
     }
 

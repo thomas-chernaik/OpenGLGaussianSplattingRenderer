@@ -248,22 +248,21 @@ end_header
 
     file.close()
 
-# Lets create a simple example with 1 splat
-means = np.array([[0, 0, 0]], dtype=np.float32)
-# rotation identity
-rotations = np.array([[0, 0, 0, 1]], dtype=np.float32)
-# scale 1, 1, 1
-scales = np.array([[1, 1, 1]], dtype=np.float32)
-# opacity 1
-opacities = np.array([1], dtype=np.float32)
-# color white
-colours = np.array([[1, 1, 1]], dtype=np.float32)
-# Save the ply file
-save_ply("models/testSingleItem.ply", means, rotations, scales, opacities, colours)
+# Lets create a simple example with 100 splats arranged in a grid
+numSplats = 100
+means = np.zeros((numSplats, 3), dtype=np.float32)
+rotations = np.zeros((numSplats, 4), dtype=np.float32)
+scales = np.zeros((numSplats, 3), dtype=np.float32)
+opacities = np.zeros((numSplats, 1), dtype=np.float32)
+colours = np.zeros((numSplats, 3), dtype=np.float32)
 
-# lets read it back to check it worked
-data = load_ply("models/testSingleItem.ply")
-#compare the data
-assert np.all(data.xyz == means)
-assert np.all(data.rot == rotations)
-assert np.all(data.scale == scales)
+# Arrange the splats in a grid
+for i in range(numSplats):
+    means[i] = np.array([i % 10, i // 10, 0], dtype=np.float32)
+    rotations[i] = np.array([0, 0, 0, 1], dtype=np.float32)
+    scales[i] = np.array([0.1, 0.1, 0.1], dtype=np.float32)
+    opacities[i] = np.array([0.5], dtype=np.float32)
+    colours[i] = np.array([1, 0, 0], dtype=np.float32)
+
+# Save the ply file
+save_ply("models/gridSplats.ply", means, rotations, scales, opacities, colours)

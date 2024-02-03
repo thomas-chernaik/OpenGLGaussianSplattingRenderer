@@ -15,6 +15,8 @@ Splats::Splats(const std::string &filePath)
     loadSplats(filePath);
     computeCovarianceMatrices();
     loadToGPU();
+
+    glFinish();
     std::cout << "finished setting up splats" << std::endl;
 }
 
@@ -756,62 +758,53 @@ void Splats::cpuRender(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, 
 {
     //create the image to render to, as a 2D vector of vec4s
     std::vector<std::vector<glm::vec4>> image(width, std::vector<glm::vec4>(height, glm::vec4(0, 0, 0, 0)));
-    //create a depth buffer, as a vector of floats, one for each splat
-    depthBuffer = std::vector<float>(numSplats);
-    //create a vector of the projected means, one for each splat
-    projectedMeans = std::vector<glm::vec2>(numSplats);
-    //create a vector of the conics, one for each splat
-    conics = std::vector<glm::vec3>(numSplats);
-    cpuProjectSplats(vpMatrix, rotationMatrix, width, height);
-    //sort the splats by depth
-    std::vector<int> indices(numSplats);
-    std::iota(indices.begin(), indices.end(), 0);
-    std::sort(indices.begin(), indices.end(), [&](int a, int b) { return depthBuffer[a] < depthBuffer[b]; });
-    int count = 0;
-    //for each pixel in the image
-    for(int h=0; h<height; h++)
+    // for each splat, project the mean
+    for(int i=0; i < numSplats; i++)
     {
-        for(int w=0; w<width; w++)
+        //project the mean
+        glm::vec4 projectedMean = vpMatrix * glm::vec4(means3D[i], 1);
+        //divide by w
+        projectedMean /= fmax(projectedMean[3], 0.0001f);
+        //convert to screen space
+        projectedMean = (projectedMean + 1.f) * 0.5f;
+        // convert to pixel space
+        projectedMean *= glm::vec4(width, height, 1, 1);
+        //project the 3d covariance matrix
+        glm::vec3 covariance2D = get2DCovariance(glm::mat3(covarianceMatrices[i][0], covarianceMatrices[i][1], covarianceMatrices[i][2],
+                                                           covarianceMatrices[i][1], covarianceMatrices[i][3], covarianceMatrices[i][4],
+                                                           covarianceMatrices[i][2], covarianceMatrices[i][4], covarianceMatrices[i][5]),
+                                                 projectedMean, rotationMatrix);
+        float determinant = covariance2D[0] * covariance2D[2] - covariance2D[1] * covariance2D[1];
+        float inverseDeterminant = 1.f / determinant;
+        glm::vec3 conic = glm::vec3(covariance2D[2], -covariance2D[1], covariance2D[0]) * inverseDeterminant;
+        // sample the conic
+        //assume it doesn't extend more than 20 pixels from the mean
+        for(int x = -5; x < 5; x++)
         {
-            //convert the pixel to clip space
-            glm::vec2 pixel = glm::vec2((w / (float)width) * 2 - 1, (h / (float)height) * 2 - 1);
-            glm::vec4 blendedColour = glm::vec4(0, 0, 0, 0);
-            //for each splat
-            for(int i=0; i<numSplats; i++)
+            for(int y = -5; y < 5; y++)
             {
-                //get the index of the splat
-                int index = i;
-                //get the projected mean of the splat
-                glm::vec2 projectedMean = projectedMeans[index];
-                //get the distance from the pixel to the projected mean
-                float distance = glm::distance(pixel, projectedMean);
-                glm::vec2 pixelToProjectedMean = pixel - projectedMean;
-                /*
-                pixelToProjectedMean *= 100;
-                //sample the conic
-                float power = -0.5 * (conics[index].x * pixelToProjectedMean.x * pixelToProjectedMean.x + conics[i].z * pixelToProjectedMean.y * pixelToProjectedMean.y) - conics[index].y * pixelToProjectedMean.x * pixelToProjectedMean.y;
-                if (power > 0)
-                    continue;
-                float alpha = std::min(0.99f, exp(power) * opacities[index]);
-                //blend the colour
-                float remainingAlpha = 1 - blendedColour.a;
-                float alphaToBlend = alpha * remainingAlpha;
-                blendedColour = blendedColour + glm::vec4 (alphaToBlend * colours[index], alphaToBlend);
-                //if the alpha is 1, stop blending
-                if(blendedColour.a >= 0.99f)
+                //get the pixel
+                int pixelX = projectedMean[0] + x;
+                int pixelY = projectedMean[1] + y;
+                //check it is in bounds
+                if(pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height)
                 {
-                    break;
-                }*/
-                if(distance < 0.01)
-                {
-                    blendedColour = glm::vec4(colours[index], opacities[index]);
+                    //get the pixel
+                    glm::vec4& pixel = image[pixelX][pixelY];
+                    //get the position of the pixel in screen space
+                    glm::vec2 pixelPosition = glm::vec2(pixelX, pixelY);
+                    //get the position of the mean in screen space
+                    glm::vec2 meanPosition = glm::vec2(projectedMean[0], projectedMean[1]);
+                    //get the distance from the mean to the pixel
+                    float distance = glm::distance(pixelPosition, meanPosition);
+                    //get the value of the conic at the distance
+                    float power = -0.5f * (conic.x * (pixelX - meanPosition.x) * (pixelX - meanPosition.x)  + conic.z * (pixelY - meanPosition.y) * (pixelY - meanPosition.y) ) - conic.y * (pixelX - meanPosition.x) * (pixelY - meanPosition.y);
+                    float alpha = std::min(0.99f, exp(power) * opacities[i]);
+                    alpha = 1;
+                    //add the value to the pixel
+                    pixel = glm::vec4(colours[i], alpha);
                 }
-
-
             }
-            //save the pixel to the image
-            image[w][h] = blendedColour;
-            count = 0;
         }
     }
     //store the image in a png
@@ -865,14 +858,18 @@ glm::vec3 Splats::get2DCovariance(glm::mat3 covarianceMatrix, glm::vec3 projecte
 
 void Splats::simplifiedDraw(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height)
 {
+    //barrier
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     //clear the texture
-    std::vector<unsigned char> textureData(width * height * 4, 255);
+    std::vector<unsigned char> textureData(width * height * 4, 0);
     //bind the texture
     glBindTexture(GL_TEXTURE_2D, texture);
     //load the image
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, textureData.data());
     //unbind the texture
     glBindTexture(GL_TEXTURE_2D, 0);
+    //barrier
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     //bind the shader
     glUseProgram(simplifiedDrawProgram);
     //bind the buffers
@@ -895,7 +892,7 @@ void Splats::simplifiedDraw(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int wi
 
     //run the shader
     glDispatchCompute(1, 1,  1);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
     //check for errors
     GLenum error = glGetError();
     if(error != GL_NO_ERROR)
