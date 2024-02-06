@@ -177,3 +177,36 @@ void Camera::rotateDown(float angle)
 {
     rotateUp(-angle);
 }
+
+float Camera::getFocalX()
+{
+    float fovy_rad = glm::radians(fovy);
+
+    float focal_x = (float)width / (2.0f * tanf(fovy_rad / 2.0f));
+
+    return focal_x;
+}
+
+float Camera::getFocalY()
+{
+    float fovy_rad = glm::radians(fovy);
+
+    float focal_y = (float)height / (2.0f * tanf(fovy_rad / 2.0f));
+
+    return focal_y;
+}
+
+float Camera::getTanFovx()
+{
+    float fovx = 2.f * atanf(tan(fovy / 2.f) * aspect);
+
+    float tan_fov_x = tanf(fovx / 2.0f);
+
+    return tan_fov_x;
+}
+float Camera::getTanFovy()
+{
+    float tan_fov_y = tanf(fovy / 2.0f);
+
+    return tan_fov_y;
+}

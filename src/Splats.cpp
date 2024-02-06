@@ -3,9 +3,13 @@
 //
 
 #include "Splats.h"
+
 #define STB_IMAGE_IMPLEMENTATION
+
 #include "stb_image.h"
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+
 #include "stb_image_write.h"
 
 Splats::Splats(const std::string &filePath)
@@ -74,7 +78,8 @@ void Splats::loadToGPU()
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, coloursBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, colours.size() * sizeof(glm::vec3), colours.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, sphericalHarmonicsBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sphericalHarmonics.size() * sizeof(float), sphericalHarmonics.data(), GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sphericalHarmonics.size() * sizeof(float), sphericalHarmonics.data(),
+                 GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, opacitiesBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, opacities.size() * sizeof(float), opacities.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, CovarianceBuffer);
@@ -93,7 +98,7 @@ void Splats::loadToGPU()
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, keyBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, intermediateBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats  * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * sizeof(int), nullptr, GL_STATIC_DRAW);
 
@@ -122,10 +127,10 @@ void Splats::loadToGPU()
     //a quad made of 2 triangles
     std::vector<glm::vec3> vertices = {
             {-1, -1, 0},
-            {1, -1, 0},
-            {1, 1, 0},
-            {1, 1, 0},
-            {-1, 1, 0},
+            {1,  -1, 0},
+            {1,  1,  0},
+            {1,  1,  0},
+            {-1, 1,  0},
             {-1, -1, 0}
     };
     //load the vertices into the vbo
@@ -232,14 +237,14 @@ void Splats::loadSplats(const std::string &filePath)
      */
     //open the file at filePath
     std::fstream file(filePath, std::ios::in | std::ios::binary);
-    if(!file.is_open())
+    if (!file.is_open())
     {
         std::cerr << "Error: failed to open file " << filePath << std::endl;
         return;
     }
     //read through the file until the 3rd line after element vertex
     std::string line;
-    for(int i = 0; i < 2; i++)
+    for (int i = 0; i < 2; i++)
     {
         std::getline(file, line);
     }
@@ -250,7 +255,7 @@ void Splats::loadSplats(const std::string &filePath)
     ss >> element >> element >> numSplats;
     std::cout << "num splats: " << numSplats << std::endl;
     //read through the file until the end_header line
-    while(line != "end_header")
+    while (line != "end_header")
     {
         std::getline(file, line);
     }
@@ -261,7 +266,7 @@ void Splats::loadSplats(const std::string &filePath)
     int count = 0;
     //read the splats into the vectors
     //the splats are stored as floats, in little endian format
-    for(int i = 0; i < numSplats; i++)
+    for (int i = 0; i < numSplats; i++)
     {
         //read the mean
         float mean[3];
@@ -279,7 +284,7 @@ void Splats::loadSplats(const std::string &filePath)
         //(0.5 + SH_C0 * rawVertex['f_dc_0']) * 255;
         float colour[3];
         file.read((char *) colour, sizeof(float) * 3);
-        for(int i=0; i<3; i++)
+        for (int i = 0; i < 3; i++)
         {
             colour[i] = (0.5 + (SH_C0 * colour[i])) * 255.f;
             //colour[i] = exp(colour[i]);
@@ -289,7 +294,7 @@ void Splats::loadSplats(const std::string &filePath)
         //read the spherical harmonics (44 floats)
         float sphericalHarmonic[45];
         file.read((char *) sphericalHarmonic, sizeof(float) * 45);
-        for(int j = 0; j < 45; j++)
+        for (int j = 0; j < 45; j++)
         {
             sphericalHarmonics.push_back(sphericalHarmonic[j]);
         }
@@ -297,9 +302,9 @@ void Splats::loadSplats(const std::string &filePath)
         float opacity;
         file.read((char *) &opacity, sizeof(float));
         //(1 / (1 + Math.exp(-rawVertex['opacity']))) * 255;
-        opacity = (1/(1+exp(-opacity)));
+        opacity = (1 / (1 + exp(-opacity)));
         //increase count if opacity less than 1
-        if(opacity < 1)
+        if (opacity < 1)
         {
             count++;
         }
@@ -308,7 +313,7 @@ void Splats::loadSplats(const std::string &filePath)
         float scale[3];
         file.read((char *) scale, sizeof(float) * 3);
         // do exp(scale) to get the scale
-        for(int i=0; i<3; i++)
+        for (int i = 0; i < 3; i++)
         {
             scale[i] = exp(scale[i]);
         }
@@ -318,7 +323,8 @@ void Splats::loadSplats(const std::string &filePath)
         float rotation[4];
         file.read((char *) rotation, sizeof(float) * 4);
         // normalise the rotation
-        float length = sqrt(rotation[0] * rotation[0] + rotation[1] * rotation[1] + rotation[2] * rotation[2] + rotation[3] * rotation[3]);
+        float length = sqrt(rotation[0] * rotation[0] + rotation[1] * rotation[1] + rotation[2] * rotation[2] +
+                            rotation[3] * rotation[3]);
         rotation[0] /= length;
         rotation[1] /= length;
         rotation[2] /= length;
@@ -330,7 +336,7 @@ void Splats::loadSplats(const std::string &filePath)
     char c;
     file.read(&c, sizeof(char));
     //check we have reached the end of the file
-    if(!file.eof())
+    if (!file.eof())
     {
         std::cerr << "Error: failed to read all splats from file" << std::endl;
         return;
@@ -375,9 +381,11 @@ void Splats::preprocess(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width,
     glUniform1i(glGetUniformLocation(preProcessProgram, "width"), width);
     glUniform1i(glGetUniformLocation(preProcessProgram, "height"), height);
     //run the shader
-    glDispatchCompute(numSplats / 256, 1, 1);
+    glDispatchCompute(numSplats, 1, 1);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     std::cout << "Finished preprocessing splats" << std::endl;
+    //DEBUG: print the projected means
+    //printProjectedMeans();
 #ifdef DEBUG
     //print out the keys (buffer of vec2s)
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, keyBuffer);
@@ -457,11 +465,11 @@ void Splats::duplicateKeys()
     std::cout << "Finished generating keys" << std::endl;
     //print the atomic counters
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, numCulled);
-    GLuint* numCulledData = (GLuint*)glMapBuffer(GL_ATOMIC_COUNTER_BUFFER, GL_READ_ONLY);
+    GLuint *numCulledData = (GLuint *) glMapBuffer(GL_ATOMIC_COUNTER_BUFFER, GL_READ_ONLY);
     std::cout << "num culled: " << numCulledData[0] << std::endl;
     glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, numDuplicates);
-    GLuint* numDuplicatesData = (GLuint*)glMapBuffer(GL_ATOMIC_COUNTER_BUFFER, GL_READ_ONLY);
+    GLuint *numDuplicatesData = (GLuint *) glMapBuffer(GL_ATOMIC_COUNTER_BUFFER, GL_READ_ONLY);
     std::cout << "num duplicates: " << numDuplicatesData[0] << std::endl;
     glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);
 
@@ -474,33 +482,11 @@ void Splats::sort()
 {
     std::cout << "Sorting splats" << std::endl;
     double time = glfwGetTime();
-    GPURadixSort2(histogramProgram, prefixSumProgram, sortProgram, keyBuffer, intermediateBuffer, indexBuffer, histogramBuffer,
+    GPURadixSort2(histogramProgram, prefixSumProgram, sortProgram, keyBuffer, intermediateBuffer, indexBuffer,
+                  histogramBuffer,
                   numSplatsPostCull, 8, 256);
     std::cout << "Finished sorting splats" << std::endl;
     std::cout << "Time taken to sort: " << glfwGetTime() - time << std::endl;
-    //DEBUG: print the keys and indices
-    //load the keys and indices into vectors
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, keyBuffer);
-    glm::uvec2* keys = (glm::uvec2*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, indexBuffer);
-    int* indices = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-    // convert them into vectors
-    std::vector<glm::uvec2> keysVec(keys, keys + numSplats * 2);
-    std::vector<int> indicesVec(indices, indices + numSplats * 2);
-    //get the projected means as a vector
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedMeansBuffer);
-    float* projectedMeans = (float*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-    std::vector<float> projectedMeansVec(projectedMeans, projectedMeans + numSplats * 2);
-    //print the keys and indices
-    for(int i = 0; i < numSplats * 2; i++)
-    {
-        //std::cout << "key: " << keysVec[i][0] << " " << keysVec[i][1] << " index: " << indicesVec[i] << std::endl;
-        if(keysVec[i][0] != 10000 && keysVec[i][0] != 9999)
-        {
-            //std::cout << "projected mean: " << projectedMeansVec[i * 2] << " " << projectedMeansVec[i * 2 + 1] << std::endl;
-
-        }
-    }
 
 }
 
@@ -610,7 +596,7 @@ void Splats::computeCovarianceMatrices()
 {
     std::cout << "Computing covariance matrices" << std::endl;
     //compute the 3D covariance matrix for each splat
-    for(int i = 0; i < numSplats; i++)
+    for (int i = 0; i < numSplats; i++)
     {
         //get the scale and rotation of the splat
         glm::vec3 scale = scales[i];
@@ -618,8 +604,9 @@ void Splats::computeCovarianceMatrices()
         //compute the 3D covariance matrix
         glm::mat3x3 covariance = computeCovarianceMatrix(scale, rotation);
         //store only the upper triangular part of the matrix, as it is symmetric
-        covarianceMatrices.push_back({covariance[0][0], covariance[0][1], covariance[0][2], covariance[1][1], covariance[1][2],
-                               covariance[2][2]});
+        covarianceMatrices.push_back(
+                {covariance[0][0], covariance[0][1], covariance[0][2], covariance[1][1], covariance[1][2],
+                 covariance[2][2]});
     }
     std::cout << "Finished computing covariance matrices" << std::endl;
 }
@@ -631,12 +618,20 @@ glm::mat3x3 Splats::computeCovarianceMatrix(const glm::vec3 scale, const glm::ve
 
     //normalise the rotation quaternion
     float length = rotation.length();
-    glm::vec4 normalisedRotation = glm::vec4(rotation[0] / length, rotation[1] / length, rotation[2] / length, rotation[3] / length);
+    glm::vec4 normalisedRotation = glm::vec4(rotation[0] / length, rotation[1] / length, rotation[2] / length,
+                                             rotation[3] / length);
     //create the rotation matrix
     //https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
-    glm::mat3x3 rotationMatrix = glm::mat3x3( 1-2*(normalisedRotation[1]*normalisedRotation[1] + normalisedRotation[2]*normalisedRotation[2]), 2*(normalisedRotation[0]*normalisedRotation[1] - normalisedRotation[2]*normalisedRotation[3]), 2*(normalisedRotation[0]*normalisedRotation[2] + normalisedRotation[1]*normalisedRotation[3]),
-                                              2*(normalisedRotation[0]*normalisedRotation[1] + normalisedRotation[2]*normalisedRotation[3]), 1-2*(normalisedRotation[0]*normalisedRotation[0] + normalisedRotation[2]*normalisedRotation[2]), 2*(normalisedRotation[1]*normalisedRotation[2] - normalisedRotation[0]*normalisedRotation[3]),
-                                              2*(normalisedRotation[0]*normalisedRotation[2] - normalisedRotation[1]*normalisedRotation[3]), 2*(normalisedRotation[1]*normalisedRotation[2] + normalisedRotation[0]*normalisedRotation[3]), 1-2*(normalisedRotation[0]*normalisedRotation[0] + normalisedRotation[1]*normalisedRotation[1]));
+    glm::mat3x3 rotationMatrix = glm::mat3x3(
+            1 - 2 * (normalisedRotation[1] * normalisedRotation[1] + normalisedRotation[2] * normalisedRotation[2]),
+            2 * (normalisedRotation[0] * normalisedRotation[1] - normalisedRotation[2] * normalisedRotation[3]),
+            2 * (normalisedRotation[0] * normalisedRotation[2] + normalisedRotation[1] * normalisedRotation[3]),
+            2 * (normalisedRotation[0] * normalisedRotation[1] + normalisedRotation[2] * normalisedRotation[3]),
+            1 - 2 * (normalisedRotation[0] * normalisedRotation[0] + normalisedRotation[2] * normalisedRotation[2]),
+            2 * (normalisedRotation[1] * normalisedRotation[2] - normalisedRotation[0] * normalisedRotation[3]),
+            2 * (normalisedRotation[0] * normalisedRotation[2] - normalisedRotation[1] * normalisedRotation[3]),
+            2 * (normalisedRotation[1] * normalisedRotation[2] + normalisedRotation[0] * normalisedRotation[3]),
+            1 - 2 * (normalisedRotation[0] * normalisedRotation[0] + normalisedRotation[1] * normalisedRotation[1]));
     //compute the 3D covariance matrix from the transformation matrix
     //https://users.cs.utah.edu/~tch/CS4640F2019/resources/A%20geometric%20interpretation%20of%20the%20covariance%20matrix.pdf
     // sigma = T * T^T
@@ -698,29 +693,37 @@ void Splats::computeBins()
 void Splats::printProjectedMeans()
 {
     //load the projected means from the gpu
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedMeansBuffer);
-    float* projectedMeans = (float*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-    //print the projected means
-    for(int i = 0; i < 50000; i++)
+//    glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedMeansBuffer);
+//    glm::vec2 *projectedMeans = (glm::vec2*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+//    //print the projected means
+//    for(int i = 0; i < std::min(5000, numSplats); i++)
+//    {
+//        std::cout << "Projected mean " << i << ": " << projectedMeans[i].x << ", " << projectedMeans[i].y << std::endl;
+//    }
+    //load the means from the gpu as an array of floats
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, means3DBuffer);
+    float *means = (float *) glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    for (int i = 0; i < std::min(5000, numSplats) * 3; i++)
     {
-        std::cout << "Projected mean " << i << ": " << projectedMeans[i * 2] << ", " << projectedMeans[i * 2 + 1] << std::endl;
+        std::cout << "Mean " << i / 3 << ": " << means[i] << std::endl;
     }
+
 }
 
 void Splats::printProjectedMeansByIndex()
 {
     //get the indices
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, indexBuffer);
-    int* indices = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    int *indices = (int *) glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
     //get the projected means
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedMeansBuffer);
-    float* projectedMeans = (float*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    float *projectedMeans = (float *) glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
     //get the keys
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, keyBuffer);
-    glm::uvec2* keys = (glm::uvec2*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    glm::uvec2 *keys = (glm::uvec2 *) glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
     std::cout << "hskdjhfksdhjf" << std::endl;
     //print the projected means
-    for(int i = 0; i < numSplatsPostCull; i++)
+    for (int i = 0; i < numSplatsPostCull; i++)
     {
         int index = indices[i];
         //std::cout << "Projected mean " << index << ": " << projectedMeans[index * 2] << ", " << projectedMeans[index * 2 + 1] << std::endl;
@@ -731,14 +734,17 @@ void Splats::printProjectedMeansByIndex()
 }
 
 
-void saveImage(const std::vector<std::vector<glm::vec4>>& image, const std::string& filename) {
+void saveImage(const std::vector<std::vector<glm::vec4>> &image, const std::string &filename)
+{
     int width = image.size();
     int height = image[0].size();
 
     std::vector<unsigned char> pixels(width * height * 4);
 
-    for (int h = 0; h < height; ++h) {
-        for (int w = 0; w < width; ++w) {
+    for (int h = 0; h < height; ++h)
+    {
+        for (int w = 0; w < width; ++w)
+        {
             glm::vec4 color = image[w][h];
             // Convert color from [0, 1] to [0, 255]
             //color *= 255.0f;
@@ -754,68 +760,170 @@ void saveImage(const std::vector<std::vector<glm::vec4>>& image, const std::stri
     stbi_write_png(filename.c_str(), width, height, 4, pixels.data(), width * 4);
 }
 
-void Splats::cpuRender(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height)
+void
+Splats::cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int height, float focal_x, float focal_y,
+                  float tan_fov_x, float tan_fov_y, glm::mat4 vpMatrix)
 {
     //create the image to render to, as a 2D vector of vec4s
     std::vector<std::vector<glm::vec4>> image(width, std::vector<glm::vec4>(height, glm::vec4(0, 0, 0, 0)));
+    //vector for the depth buffer for each splat
+    std::vector<float> depthBuffer(numSplats);
+    //vector for the pixel-projected means
+    std::vector<glm::vec2> projectedMeans(numSplats);
+    //vector for the pixel-projected 2D covariance matrices
+    std::vector<glm::vec3> projectedCovariances(numSplats);
+    //vector for the bounding radii of the splats
+    std::vector<float> boundingRadii(numSplats);
     // for each splat, project the mean
-    for(int i=0; i < numSplats; i++)
+    for (int i = 0; i < numSplats; i++)
     {
         //project the mean
+        glm::vec3 t = viewMatrix * glm::vec4(means3D[i], 1);
+        float limx = -1.3f * tan_fov_x;
+        float limy = -1.3f * tan_fov_y;
+        float txtz = t.x / t.z;
+        float tytz = t.y / t.z;
+        t.x = std::min(limx, std::max(-limx, txtz)) * t.z;
+        t.y = std::min(limy, std::max(-limy, tytz)) * t.z;
+        glm::mat3 Jacobian = glm::mat3(
+                focal_x / t.z, 0.0f, -(focal_x * t.x) / (t.z * t.z),
+                0.0f, focal_y / t.z, -(focal_y * t.y) / (t.z * t.z),
+                0, 0, 0);
+
+
+        glm::mat3 T = rotationMatrix * Jacobian;
+        glm::mat3 covarianceMatrix = glm::mat3(
+                covarianceMatrices[i][0], covarianceMatrices[i][1], covarianceMatrices[i][2],
+                covarianceMatrices[i][1], covarianceMatrices[i][3], covarianceMatrices[i][4],
+                covarianceMatrices[i][2], covarianceMatrices[i][4], covarianceMatrices[i][5]);
+
+        glm::mat3 covariance2D = glm::transpose(T) * glm::transpose(covarianceMatrix) * T;
+        covariance2D[0][0] += 0.3f;
+        covariance2D[1][1] += 0.3f;
+        glm::vec3 covariance2DCompressed = glm::vec3(covariance2D[0][0], covariance2D[0][1], covariance2D[1][1]);
+        //invert the covariance matrix
+        float determinant = covariance2DCompressed[0] * covariance2DCompressed[2] - covariance2DCompressed[1] * covariance2DCompressed[1];
+        if(determinant == 0)
+        {
+            continue;
+        }
+        float inverseDeterminant = 1.f / determinant;
+        glm::vec3 conic = glm::vec3(covariance2DCompressed[2], -covariance2DCompressed[1], covariance2DCompressed[0]) * inverseDeterminant;
+        //store the conic
+        projectedCovariances[i] = conic;
+        //calculate a bounding box for the conic based on the biggest eigenvalue
+        //calculate the eigenvalues
+        float middle = (covariance2DCompressed.z + covariance2DCompressed.x) * 0.5f;
+        float lambda1 = middle + sqrt(std::max(0.1f, middle * middle - determinant));
+        float lambda2 = middle - sqrt(std::max(0.1f, middle * middle - determinant));
+        float radius = ceil(3.f * sqrt(std::max(lambda1, lambda2)));
+        //store the radius
+        boundingRadii[i] = radius;
+
+
+        //project the mean
         glm::vec4 projectedMean = vpMatrix * glm::vec4(means3D[i], 1);
-        //divide by w
+        //normalise the projected mean
         projectedMean /= fmax(projectedMean[3], 0.0001f);
+        //store the depth
+        //TODO: encode the depths into an int so we can store them in fewer bits
+        depthBuffer[i] = projectedMean[2];
         //convert to screen space
         projectedMean = (projectedMean + 1.f) * 0.5f;
-        // convert to pixel space
-        projectedMean *= glm::vec4(width, height, 1, 1);
-        //project the 3d covariance matrix
-        glm::vec3 covariance2D = get2DCovariance(glm::mat3(covarianceMatrices[i][0], covarianceMatrices[i][1], covarianceMatrices[i][2],
-                                                           covarianceMatrices[i][1], covarianceMatrices[i][3], covarianceMatrices[i][4],
-                                                           covarianceMatrices[i][2], covarianceMatrices[i][4], covarianceMatrices[i][5]),
-                                                 projectedMean, rotationMatrix);
-        float determinant = covariance2D[0] * covariance2D[2] - covariance2D[1] * covariance2D[1];
-        float inverseDeterminant = 1.f / determinant;
-        glm::vec3 conic = glm::vec3(covariance2D[2], -covariance2D[1], covariance2D[0]) * inverseDeterminant;
-        // sample the conic
-        //assume it doesn't extend more than 20 pixels from the mean
-        for(int x = -5; x < 5; x++)
+        //convert to pixel space
+        projectedMean[0] *= width;
+        projectedMean[1] *= height;
+        //store the projected mean
+        projectedMeans[i] = glm::vec2(projectedMean[0], projectedMean[1]);
+    }
+    //sort the splats by depth
+    std::vector<int> indices(numSplats);
+    //fill the indices vector with the numbers 0 to numSplats
+    std::iota(indices.begin(), indices.end(), 0);
+    //sort the indices by the depth buffer
+    std::sort(indices.begin(), indices.end(), [&depthBuffer](int i1, int i2) { return depthBuffer[i1] < depthBuffer[i2]; });
+
+    //per pixel rasterisation
+    for(int y=0; y < height; y++)
+    {
+        for(int x=0; x<width; x++)
         {
-            for(int y = -5; y < 5; y++)
+            for(int i=0; i<numSplats; i++)
+            {
+                int index = indices[i];
+                glm::vec2 projectedMean = projectedMeans[index];
+                float radius = boundingRadii[index];
+                //check if the pixel is in the bounding box
+                if (x >= projectedMean[0] - radius && x <= projectedMean[0] + radius &&
+                    y >= projectedMean[1] - radius && y <= projectedMean[1] + radius)
+                {
+                    glm::vec3 conic = projectedCovariances[index];
+                    //get the value of the conic at the distance
+                    float power = -0.5f * (conic.x * (x - projectedMean.x) * (x - projectedMean.x) +
+                                           conic.z * (y - projectedMean.y) * (y - projectedMean.y)) -
+                                  conic.y * (x - projectedMean.x) * (y - projectedMean.y);
+                    float alpha = std::min(0.99f, exp(power));
+                    //add the value to the pixel
+                    image[x][y] = alphaBlend(image[x][y], glm::vec4(1, 0, 0, alpha));
+                }
+            }
+        }
+    }
+
+    /*
+    //per splat rasterisation
+    for (int i = 0; i < numSplats; i++)
+    {
+        float radius = boundingRadii[i];
+        glm::vec3 conic = projectedCovariances[i];
+        glm::vec2 projectedMean = projectedMeans[i];
+        for (int x = -radius; x < radius; x++)
+        {
+            for (int y = -radius; y < radius; y++)
             {
                 //get the pixel
                 int pixelX = projectedMean[0] + x;
                 int pixelY = projectedMean[1] + y;
                 //check it is in bounds
-                if(pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height)
+                if (pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height)
                 {
                     //get the pixel
-                    glm::vec4& pixel = image[pixelX][pixelY];
+                    glm::vec4 &pixel = image[pixelX][pixelY];
                     //get the position of the pixel in screen space
                     glm::vec2 pixelPosition = glm::vec2(pixelX, pixelY);
                     //get the position of the mean in screen space
                     glm::vec2 meanPosition = glm::vec2(projectedMean[0], projectedMean[1]);
-                    //get the distance from the mean to the pixel
-                    float distance = glm::distance(pixelPosition, meanPosition);
                     //get the value of the conic at the distance
-                    float power = -0.5f * (conic.x * (pixelX - meanPosition.x) * (pixelX - meanPosition.x)  + conic.z * (pixelY - meanPosition.y) * (pixelY - meanPosition.y) ) - conic.y * (pixelX - meanPosition.x) * (pixelY - meanPosition.y);
+                    float power = -0.5f * (conic.x * (pixelX - meanPosition.x) * (pixelX - meanPosition.x) +
+                                           conic.z * (pixelY - meanPosition.y) * (pixelY - meanPosition.y)) -
+                                  conic.y * (pixelX - meanPosition.x) * (pixelY - meanPosition.y);
                     float alpha = std::min(0.99f, exp(power) * opacities[i]);
-                    alpha = 1;
+                    //alpha = 1;
                     //add the value to the pixel
-                    pixel = glm::vec4(colours[i], alpha);
+                    pixel = alphaBlend(pixel, glm::vec4(colours[i], alpha));
                 }
             }
         }
-    }
+    }*/
     //store the image in a png
     saveImage(image, "cpuRender.png");
 
 }
 
+glm::vec4 Splats::alphaBlend(glm::vec4 colour1, glm::vec4 colour2)
+{
+    float alpha1 = colour1.a;
+    float alpha2 = colour2.a;
+    float remainingAlpha = 1 - alpha1;
+    float alphaToBlend = alpha2 * remainingAlpha;
+    glm::vec3 blendedColour = glm::vec3(colour1) + glm::vec3(colour2) * alphaToBlend;
+    return glm::vec4(blendedColour, alpha1 + alphaToBlend);
+}
+
 void Splats::cpuProjectSplats(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height)
 {
     //for each splat, project the mean and then the 3d covariance matrix
-    for(int i = 0; i < numSplats; i++)
+    for (int i = 0; i < numSplats; i++)
     {
         //project the mean
         glm::vec4 projectedMean = vpMatrix * glm::vec4(means3D[i], 1);
@@ -828,10 +936,11 @@ void Splats::cpuProjectSplats(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int 
         //store the depth
         depthBuffer[i] = projectedMean[2];
         //project the 3d covariance matrix
-        glm::vec3 covariance2D = get2DCovariance(glm::mat3(covarianceMatrices[i][0], covarianceMatrices[i][1], covarianceMatrices[i][2],
-                                                           covarianceMatrices[i][1], covarianceMatrices[i][3], covarianceMatrices[i][4],
-                                                           covarianceMatrices[i][2], covarianceMatrices[i][4], covarianceMatrices[i][5]),
-                                                 projectedMean, rotationMatrix);
+        glm::vec3 covariance2D = get2DCovariance(
+                glm::mat3(covarianceMatrices[i][0], covarianceMatrices[i][1], covarianceMatrices[i][2],
+                          covarianceMatrices[i][1], covarianceMatrices[i][3], covarianceMatrices[i][4],
+                          covarianceMatrices[i][2], covarianceMatrices[i][4], covarianceMatrices[i][5]),
+                projectedMean, rotationMatrix);
         float determinant = covariance2D[0] * covariance2D[2] - covariance2D[1] * covariance2D[1];
         float inverseDeterminant = 1.f / determinant;
         glm::vec3 conic = glm::vec3(covariance2D[2], -covariance2D[1], covariance2D[0]) * inverseDeterminant;
@@ -844,10 +953,11 @@ glm::vec3 Splats::get2DCovariance(glm::mat3 covarianceMatrix, glm::vec3 projecte
 {
     float lPrime = length(projectedMean);
     glm::mat3 jacobian = glm::mat3(
-            1/projectedMean.z, 0, -projectedMean.x/(projectedMean.z*projectedMean.z),
-            0, 1/projectedMean.z, -projectedMean.y/(projectedMean.z*projectedMean.z),
-            0,0,0);
-    glm::mat3x3 covarianceMatrix2D = jacobian * rotationMatrix * covarianceMatrix * glm::transpose(rotationMatrix) * glm::transpose(jacobian);
+            1 / projectedMean.z, 0, -projectedMean.x / (projectedMean.z * projectedMean.z),
+            0, 1 / projectedMean.z, -projectedMean.y / (projectedMean.z * projectedMean.z),
+            0, 0, 0);
+    glm::mat3x3 covarianceMatrix2D =
+            jacobian * rotationMatrix * covarianceMatrix * glm::transpose(rotationMatrix) * glm::transpose(jacobian);
 
     //apply low pass filter
     covarianceMatrix2D[0][0] += 0.3;
@@ -875,27 +985,30 @@ void Splats::simplifiedDraw(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int wi
     //bind the buffers
     //buffer 0 means
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, projectedMeansBuffer);
-    //buffer 1 opacities
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, opacitiesBuffer);
-    //buffer 2 3D covariance matrices
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, CovarianceBuffer);
-
-    //set the uniforms
-    glUniformMatrix4fv(glGetUniformLocation(simplifiedDrawProgram, "vpMatrix"), 1, GL_FALSE, &vpMatrix[0][0]);
-    glUniformMatrix3fv(glGetUniformLocation(simplifiedDrawProgram, "rotationMatrix"), 1, GL_FALSE, &rotationMatrix[0][0]);
-    glUniform1i(glGetUniformLocation(simplifiedDrawProgram, "numSplats"), numSplats);
-    glUniform1i(glGetUniformLocation(simplifiedDrawProgram, "width"), width);
-    glUniform1i(glGetUniformLocation(simplifiedDrawProgram, "height"), height);
+//    //buffer 1 opacities
+//    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, opacitiesBuffer);
+//    //buffer 2 3D covariance matrices
+//    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, CovarianceBuffer);
+//
+//    //set the uniforms
+//    glUniformMatrix4fv(glGetUniformLocation(simplifiedDrawProgram, "vpMatrix"), 1, GL_FALSE, &vpMatrix[0][0]);
+//    glUniformMatrix3fv(glGetUniformLocation(simplifiedDrawProgram, "rotationMatrix"), 1, GL_FALSE, &rotationMatrix[0][0]);
+//    glUniform1i(glGetUniformLocation(simplifiedDrawProgram, "numSplats"), numSplats);
+//    glUniform1i(glGetUniformLocation(simplifiedDrawProgram, "width"), width);
+//    glUniform1i(glGetUniformLocation(simplifiedDrawProgram, "height"), height);
+//    glUniform1i(glGetUniformLocation(simplifiedDrawProgram, "height"), height);
 
     //set the output texture
-    glBindImageTexture(0, texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+    //glBindImageTexture(0, texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
     //run the shader
-    glDispatchCompute(1, 1,  1);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+    glDispatchCompute(100, 1, 1);
+
+    glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+    glFinish();
     //check for errors
     GLenum error = glGetError();
-    if(error != GL_NO_ERROR)
+    if (error != GL_NO_ERROR)
     {
         std::cerr << "Error: " << error << std::endl;
     }

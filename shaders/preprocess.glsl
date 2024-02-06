@@ -1,5 +1,5 @@
 #version 430 core
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
 //inputs
 //means3D
@@ -59,19 +59,25 @@ vec3 get2DCovariance(mat3 covariance, vec3 projectedMean, mat3 rotationMatrix);
 float normalisedSpaceToPixelSpace(float value, int numPixels);
 
 void main() {
+
     //get the index of the splat
     int index = int(gl_GlobalInvocationID.x);
-    //if the index is greater than the number of splats, return
-    if (index >= numSplats) {
-        //set keys to a value we can recognise and ignore later
-        keys.data[index] = uvec2(allOnes, allOnes);
 
-        return;
-    }
-    //initialise the key
-    vec2 key = vec2(0.0, 0.0);
-    //get the mean
+//
+//    //if the index is greater than the number of splats, return
+//    if (index >= numSplats) {
+//        //set keys to a value we can recognise and ignore later
+//        keys.data[index] = uvec2(allOnes, allOnes);
+//
+//        return;
+//    }
+//    //initialise the key
+//    vec2 key = vec2(0.0, 0.0);
+//    //get the mean
     vec3 mean = means3D.data[index];
+    //means3D.data[index] = vec3(index, index, index);
+    //projectedMeans.data[index] = vec2(mean.x,mean.y);
+    //return;
     //project the mean
     vec4 projectedMean = vpMatrix * vec4(mean, 1.0);
     //divide by w to get the projected mean
@@ -119,6 +125,7 @@ void main() {
     radius = 0;
     //convert the projected mean to pixel space
     vec2 projectedMeanPixelSpace = vec2(normalisedSpaceToPixelSpace(projectedMean.x, width), normalisedSpaceToPixelSpace(projectedMean.y, height));
+    //projectedMeans.data[index] = projectedMeanPixelSpace;
     //calculate the bounding box
     int minX = int(projectedMeanPixelSpace.x - radius);
     int maxX = int(projectedMeanPixelSpace.x + radius);
@@ -174,7 +181,6 @@ void main() {
     //set the values
     keys.data[index] = uvec2(tileIndex, depthInt);
     conicOpacities.data[index] = vec4(conic, opacity);
-    projectedMeans.data[index] = projectedMeanPixelSpace;
 
 
 

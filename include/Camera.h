@@ -26,6 +26,10 @@ public:
     void rotateUp(float angle);
     void rotateDown(float angle);
     void getInput(GLFWwindow* window);
+    float getFocalX();
+    float getFocalY();
+    float getTanFovy();
+    float getTanFovx();
 
     glm::mat4 getViewMatrix();
     glm::mat4 getProjectionMatrix();

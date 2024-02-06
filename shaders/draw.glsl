@@ -122,19 +122,21 @@ void main() {
         }
 
     }
-    float counter2f = counter2 /  10.;
+    float counter2f = counter2;
     //change the colour space from 0-255 to 0-1, only in the RGB channels
     float alpha = blendedColour.a;
     blendedColour = blendedColour / 255.0;
     blendedColour.a = alpha;
     //write the blended colour to the output image
-    imageStore(outputImage, uv, blendedColour);
+    //imageStore(outputImage, uv, blendedColour);
     //imageStore(outputImage, uv, blendedColour2 / (255.0));
     //imageStore(outputImage, uv, vec4(counter2f, counter2f, counter2f, 1));
     //debug output the number of splats for this pixel
-    //float numSplatsFloat = float(endIndex - startIndex) / 10000.;
+    float numSplatsFloat = float(endIndex - startIndex);
+    //numSplatsFloat = 10;
     //imageStore(outputImage, uv, vec4(numSplatsFloat, numSplatsFloat, numSplatsFloat, 1));
     //debug output white
+    //imageStore(outputImage, uv, vec4(1, 1, 1, 1));
     //imageStore(outputImage, uv, vec4(startIndex, startIndex, startIndex, 1));
 
 }

@@ -79,6 +79,8 @@ class Splats
         //function to compute the 3D covariance matrix
         void computeCovarianceMatrices();
         glm::mat3x3 computeCovarianceMatrix(const glm::vec3 scale, const glm::vec4 rotation);
+        //function to return the result of alphablending two colours
+        glm::vec4 alphaBlend(glm::vec4 colour1, glm::vec4 colour2);
 
 
 
@@ -132,7 +134,8 @@ public:
     //function to print the splat's projected means in order of indices
     void printProjectedMeansByIndex();
 
-    void cpuRender(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height);
+    void cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int height, float focal_x, float focal_y,
+                   float tan_fov_x, float tan_fov_y, glm::mat4 vpMatrix);
     void cpuProjectSplats(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height);
     void simplifiedDraw(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height);
     std::vector<glm::vec2> projectedMeans;
