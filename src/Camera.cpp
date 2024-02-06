@@ -23,7 +23,7 @@ Camera::Camera(float x, float y, float z)
     fovy = 60.0f;
     aspect = 1.0f;
     near = 0.1f;
-    far = 1000.0f;
+    far = 10000.0f;
     projectionMatrix = glm::perspective(glm::radians(fovy), aspect, near, far);
     update();
 

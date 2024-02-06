@@ -774,6 +774,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int
     std::vector<glm::vec3> projectedCovariances(numSplats);
     //vector for the bounding radii of the splats
     std::vector<float> boundingRadii(numSplats);
+    int numSplatsCulled = 0;
     // for each splat, project the mean
     for (int i = 0; i < numSplats; i++)
     {
@@ -827,7 +828,14 @@ Splats::cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int
         projectedMean /= fmax(projectedMean[3], 0.0001f);
         //store the depth
         //TODO: encode the depths into an int so we can store them in fewer bits
-        depthBuffer[i] = projectedMean[2];
+        //if the pixel is off the screen, set the depth to a large number
+        if (projectedMean[0] < -1 || projectedMean[0] > 1 || projectedMean[1] < -1 || projectedMean[1] > 1)
+        {
+            depthBuffer[i] = 1000000;
+            numSplatsCulled++;
+        }
+        else
+            depthBuffer[i] = projectedMean[2];
         //convert to screen space
         projectedMean = (projectedMean + 1.f) * 0.5f;
         //convert to pixel space
@@ -842,10 +850,14 @@ Splats::cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int
     std::iota(indices.begin(), indices.end(), 0);
     //sort the indices by the depth buffer
     std::sort(indices.begin(), indices.end(), [&depthBuffer](int i1, int i2) { return depthBuffer[i1] < depthBuffer[i2]; });
-
     //per pixel rasterisation
-    for(int y=0; y < height; y++)
+    /*
+    for(int y=0; y < 10; y++)
     {
+        if(y % 1 == 0)
+        {
+            std::cout << "y: " << y << std::endl;
+        }
         for(int x=0; x<width; x++)
         {
             for(int i=0; i<numSplats; i++)
@@ -865,18 +877,27 @@ Splats::cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int
                     float alpha = std::min(0.99f, exp(power));
                     //add the value to the pixel
                     image[x][y] = alphaBlend(image[x][y], glm::vec4(1, 0, 0, alpha));
+                    //if the pixel alpha is high enough, break
+                    if(image[x][y].a > 0.99f)
+                    {
+                        break;
+                    }
                 }
             }
         }
     }
-
-    /*
+*/
+    std::cout << "num splats culled: " << numSplatsCulled << std::endl;
+    std::cout << "num splats to render: " << numSplats - numSplatsCulled << std::endl;
     //per splat rasterisation
-    for (int i = 0; i < numSplats; i++)
+    for (int i = 0; i < numSplats-numSplatsCulled; i++)
     {
-        float radius = boundingRadii[i];
-        glm::vec3 conic = projectedCovariances[i];
-        glm::vec2 projectedMean = projectedMeans[i];
+        //std::cout << "i: " << i << std::endl;
+        int index = indices[i];
+        //index = i;
+        float radius = std::min(boundingRadii[index], 50.f);
+        glm::vec3 conic = projectedCovariances[index];
+        glm::vec2 projectedMean = projectedMeans[index];
         for (int x = -radius; x < radius; x++)
         {
             for (int y = -radius; y < radius; y++)
@@ -897,17 +918,17 @@ Splats::cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int
                     float power = -0.5f * (conic.x * (pixelX - meanPosition.x) * (pixelX - meanPosition.x) +
                                            conic.z * (pixelY - meanPosition.y) * (pixelY - meanPosition.y)) -
                                   conic.y * (pixelX - meanPosition.x) * (pixelY - meanPosition.y);
-                    float alpha = std::min(0.99f, exp(power) * opacities[i]);
+                    float alpha = std::min(0.99f, exp(power) * opacities[index]);
                     //alpha = 1;
                     //add the value to the pixel
-                    pixel = alphaBlend(pixel, glm::vec4(colours[i], alpha));
+                    pixel = alphaBlend(pixel, glm::vec4(colours[index], alpha));
                 }
             }
         }
-    }*/
+    }
     //store the image in a png
     saveImage(image, "cpuRender.png");
-
+    std::cout << "Finished rendering on the cpu" << std::endl;
 }
 
 glm::vec4 Splats::alphaBlend(glm::vec4 colour1, glm::vec4 colour2)
