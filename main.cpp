@@ -37,7 +37,7 @@ int main()
 
 
     //initialise camera
-    Camera camera(5.0f, 1.5f, 0.0f);
+    Camera camera(5.0f, 0.5f, 0.0f);
     //make the camera look down a bit
     camera.rotateDown(20.0f);
     //rotate camera 40 degrees

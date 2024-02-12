@@ -9,7 +9,7 @@ Camera::Camera()
     position = glm::vec3(0.0f, 0.0f, 0.0f);
     rotation = glm::vec3(0.0f, 0.0f, 0.0f);
     fovy = 60.0f;
-    aspect = 1.0f;
+    aspect = (float)width / (float)height;
     near = 0.1f;
     far = 10000.0f;
     projectionMatrix = glm::perspective(glm::radians(fovy), aspect, near, far);
@@ -21,7 +21,7 @@ Camera::Camera(float x, float y, float z)
     position = glm::vec3(x, y, z);
     rotation = glm::vec3(0.0f, 0.0f, 0.0f);
     fovy = 60.0f;
-    aspect = 1.0f;
+    aspect = (float)width / (float)height;
     near = 0.1f;
     far = 10000.0f;
     projectionMatrix = glm::perspective(glm::radians(fovy), aspect, near, far);
