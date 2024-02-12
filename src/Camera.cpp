@@ -11,7 +11,7 @@ Camera::Camera()
     fovy = 60.0f;
     aspect = 1.0f;
     near = 0.1f;
-    far = 100.0f;
+    far = 10000.0f;
     projectionMatrix = glm::perspective(glm::radians(fovy), aspect, near, far);
     update();
 
@@ -198,9 +198,9 @@ float Camera::getFocalY()
 
 float Camera::getTanFovx()
 {
-    float fovx = 2.f * atanf(tan(fovy / 2.f) * aspect);
+    float fovx = atanf(tan(fovy / 2.f) * aspect);
 
-    float tan_fov_x = tanf(fovx / 2.0f);
+    float tan_fov_x = tanf(fovx);
 
     return tan_fov_x;
 }

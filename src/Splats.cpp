@@ -603,6 +603,9 @@ void Splats::computeCovarianceMatrices()
         glm::vec4 rotation = rotations[i];
         //compute the 3D covariance matrix
         glm::mat3x3 covariance = computeCovarianceMatrix(scale, rotation);
+        //commpute the eignenvalues and eigenvectors of the covariance matrix to check the results
+        //https://www.geometrictools.com/Documentation/RobustEigenSymmetric3x3.pdf
+
         //store only the upper triangular part of the matrix, as it is symmetric
         covarianceMatrices.push_back(
                 {covariance[0][0], covariance[0][1], covariance[0][2], covariance[1][1], covariance[1][2],
@@ -614,29 +617,51 @@ void Splats::computeCovarianceMatrices()
 glm::mat3x3 Splats::computeCovarianceMatrix(const glm::vec3 scale, const glm::vec4 rotation)
 {
     //create the scale matrix
-    glm::mat3x3 scaleMatrix = glm::mat3x3(scale[0], 0, 0, 0, scale[1], 0, 0, 0, scale[2]);
+    glm::mat3x3 scaleMatrix = glm::mat3x3(scale[0], 0, 0,
+                                          0, scale[1], 0,
+                                          0, 0, scale[2]);
 
     //normalise the rotation quaternion
-    float length = rotation.length();
-    glm::vec4 normalisedRotation = glm::vec4(rotation[0] / length, rotation[1] / length, rotation[2] / length,
-                                             rotation[3] / length);
+    //float length = 1;
+    //rotation = glm::vec4(rotation[0] / length, rotation[1] / length, rotation[2] / length,
+    //                                             rotation[3] / length);
     //create the rotation matrix
     //https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
-    glm::mat3x3 rotationMatrix = glm::mat3x3(
-            1 - 2 * (normalisedRotation[1] * normalisedRotation[1] + normalisedRotation[2] * normalisedRotation[2]),
-            2 * (normalisedRotation[0] * normalisedRotation[1] - normalisedRotation[2] * normalisedRotation[3]),
-            2 * (normalisedRotation[0] * normalisedRotation[2] + normalisedRotation[1] * normalisedRotation[3]),
-            2 * (normalisedRotation[0] * normalisedRotation[1] + normalisedRotation[2] * normalisedRotation[3]),
-            1 - 2 * (normalisedRotation[0] * normalisedRotation[0] + normalisedRotation[2] * normalisedRotation[2]),
-            2 * (normalisedRotation[1] * normalisedRotation[2] - normalisedRotation[0] * normalisedRotation[3]),
-            2 * (normalisedRotation[0] * normalisedRotation[2] - normalisedRotation[1] * normalisedRotation[3]),
-            2 * (normalisedRotation[1] * normalisedRotation[2] + normalisedRotation[0] * normalisedRotation[3]),
-            1 - 2 * (normalisedRotation[0] * normalisedRotation[0] + normalisedRotation[1] * normalisedRotation[1]));
+    /*x, y, z, w = quat
+    R = np.array([
+        [1 - 2*y**2 - 2*z**2, 2*x*y - 2*z*w, 2*x*z + 2*y*w],
+        [2*x*y + 2*z*w, 1 - 2*x**2 - 2*z**2, 2*y*z - 2*x*w],
+        [2*x*z - 2*y*w, 2*y*z + 2*x*w, 1 - 2*x**2 - 2*y**2]
+    ])*/
+    float r = rotation.x;
+    float x = rotation.y;
+    float y = rotation.z;
+    float z = rotation.w;
+
+    // Compute rotation matrix from quaternion
+    glm::mat3 rotationMatrix = glm::mat3(
+            1.f - 2.f * (y * y + z * z), 2.f * (x * y - r * z), 2.f * (x * z + r * y),
+            2.f * (x * y + r * z), 1.f - 2.f * (x * x + z * z), 2.f * (y * z - r * x),
+            2.f * (x * z - r * y), 2.f * (y * z + r * x), 1.f - 2.f * (x * x + y * y)
+    );
+
+    //rotate the rotation matrix 90 degrees around an axis
+    //https://en.wikipedia.org/wiki/Rotation_matrix
+    glm::mat3x3 rotationMatrixX = glm::mat3x3(1, 0, 0,
+                                              0, cos(90), -sin(90),
+                                              0, sin(90), cos(90));
+    glm::mat3x3 rotationMatrixY = glm::mat3x3(cos(90), 0, sin(90),
+                                              0, 1, 0,
+                                              -sin(90), 0, cos(90));
+    glm::mat3x3 rotationMatrixZ = glm::mat3x3(cos(90), -sin(90), 0,
+                                              sin(90), cos(90), 0,
+                                              0, 0, 1);
+    //rotationMatrix = rotationMatrix * rotationMatrix;
     //compute the 3D covariance matrix from the transformation matrix
     //https://users.cs.utah.edu/~tch/CS4640F2019/resources/A%20geometric%20interpretation%20of%20the%20covariance%20matrix.pdf
     // sigma = T * T^T
-    glm::mat3x3 transformationMatrix = rotationMatrix * scaleMatrix;
-    glm::mat3x3 covarianceMatrix = transformationMatrix * glm::transpose(transformationMatrix);
+    glm::mat3x3 transformationMatrix = scaleMatrix * rotationMatrix;
+    glm::mat3x3 covarianceMatrix = glm::transpose(transformationMatrix) * transformationMatrix;
     return covarianceMatrix;
 
 }
@@ -791,8 +816,14 @@ Splats::cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int
                 0.0f, focal_y / t.z, -(focal_y * t.y) / (t.z * t.z),
                 0, 0, 0);
 
+        glm::mat3 viewMatrix3 = glm::mat3{
+                viewMatrix[0][0], viewMatrix[0][1], viewMatrix[0][2],
+                viewMatrix[1][0], viewMatrix[1][1], viewMatrix[1][2],
+                viewMatrix[2][0], viewMatrix[2][1], viewMatrix[2][2]
+        };
 
-        glm::mat3 T = rotationMatrix * Jacobian;
+
+        glm::mat3 T = glm::transpose(viewMatrix3) * Jacobian;
         glm::mat3 covarianceMatrix = glm::mat3(
                 covarianceMatrices[i][0], covarianceMatrices[i][1], covarianceMatrices[i][2],
                 covarianceMatrices[i][1], covarianceMatrices[i][3], covarianceMatrices[i][4],
@@ -803,13 +834,15 @@ Splats::cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int
         covariance2D[1][1] += 0.3f;
         glm::vec3 covariance2DCompressed = glm::vec3(covariance2D[0][0], covariance2D[0][1], covariance2D[1][1]);
         //invert the covariance matrix
-        float determinant = covariance2DCompressed[0] * covariance2DCompressed[2] - covariance2DCompressed[1] * covariance2DCompressed[1];
-        if(determinant == 0)
+        float determinant = covariance2DCompressed.x * covariance2DCompressed.z -
+                            covariance2DCompressed.y * covariance2DCompressed.y;
+        if (determinant == 0)
         {
             continue;
         }
         float inverseDeterminant = 1.f / determinant;
-        glm::vec3 conic = glm::vec3(covariance2DCompressed[2], -covariance2DCompressed[1], covariance2DCompressed[0]) * inverseDeterminant;
+        glm::vec3 conic = glm::vec3(covariance2DCompressed.z, -covariance2DCompressed.y, covariance2DCompressed.x) *
+                          inverseDeterminant;
         //store the conic
         projectedCovariances[i] = conic;
         //calculate a bounding box for the conic based on the biggest eigenvalue
@@ -833,8 +866,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int
         {
             depthBuffer[i] = 1000000;
             numSplatsCulled++;
-        }
-        else
+        } else
             depthBuffer[i] = projectedMean[2];
         //convert to screen space
         projectedMean = (projectedMean + 1.f) * 0.5f;
@@ -849,7 +881,8 @@ Splats::cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int
     //fill the indices vector with the numbers 0 to numSplats
     std::iota(indices.begin(), indices.end(), 0);
     //sort the indices by the depth buffer
-    std::sort(indices.begin(), indices.end(), [&depthBuffer](int i1, int i2) { return depthBuffer[i1] < depthBuffer[i2]; });
+    std::sort(indices.begin(), indices.end(), [&depthBuffer](int i1, int i2)
+    { return depthBuffer[i1] < depthBuffer[i2]; });
     //per pixel rasterisation
     /*
     for(int y=0; y < 10; y++)
@@ -889,8 +922,10 @@ Splats::cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int
 */
     std::cout << "num splats culled: " << numSplatsCulled << std::endl;
     std::cout << "num splats to render: " << numSplats - numSplatsCulled << std::endl;
+    //vector to count the number of splats contributing to each pixel
+    std::vector<std::vector<int>> numSplatsPerPixel(width, std::vector<int>(height, 0));
     //per splat rasterisation
-    for (int i = 0; i < numSplats-numSplatsCulled; i++)
+    for (int i = 0; i < numSplats - numSplatsCulled; i++)
     {
         //std::cout << "i: " << i << std::endl;
         int index = indices[i];
@@ -914,14 +949,26 @@ Splats::cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int
                     glm::vec2 pixelPosition = glm::vec2(pixelX, pixelY);
                     //get the position of the mean in screen space
                     glm::vec2 meanPosition = glm::vec2(projectedMean[0], projectedMean[1]);
+                    glm::vec2 distance = glm::vec2(pixelX, pixelY) - meanPosition;
                     //get the value of the conic at the distance
-                    float power = -0.5f * (conic.x * (pixelX - meanPosition.x) * (pixelX - meanPosition.x) +
-                                           conic.z * (pixelY - meanPosition.y) * (pixelY - meanPosition.y)) -
-                                  conic.y * (pixelX - meanPosition.x) * (pixelY - meanPosition.y);
+                    float power = -0.5f * (conic.x * distance.x * distance.x + conic.z * distance.y * distance.y) -
+                                  conic.y * distance.x * distance.y;
+                    if(power > 0.f)
+                    {
+                        continue;
+                    }
                     float alpha = std::min(0.99f, exp(power) * opacities[index]);
+                    //if the alpha is less than the bit depth of the image, we want to ignore it
+                    if (alpha < 1.f/255.f)
+                    {
+                        continue;
+                    }
+
                     //alpha = 1;
                     //add the value to the pixel
                     pixel = alphaBlend(pixel, glm::vec4(colours[index], alpha));
+                    //count the number of splats contributing to the pixel
+                    numSplatsPerPixel[pixelX][pixelY]++;
                 }
             }
         }
@@ -929,6 +976,23 @@ Splats::cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int
     //store the image in a png
     saveImage(image, "cpuRender.png");
     std::cout << "Finished rendering on the cpu" << std::endl;
+    //print the mean, median and max number of splats per pixel
+    int total = 0;
+    int max = 0;
+    for (int x = 0; x < width; x++)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            total += numSplatsPerPixel[x][y];
+            if (numSplatsPerPixel[x][y] > max)
+            {
+                max = numSplatsPerPixel[x][y];
+            }
+        }
+    }
+    std::cout << "Mean number of splats per pixel: " << total / (width * height) << std::endl;
+    std::cout << "Max number of splats per pixel: " << max << std::endl;
+
 }
 
 glm::vec4 Splats::alphaBlend(glm::vec4 colour1, glm::vec4 colour2)

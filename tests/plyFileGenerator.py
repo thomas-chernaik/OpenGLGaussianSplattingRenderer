@@ -249,20 +249,19 @@ end_header
     file.close()
 
 # Lets create a simple example with 100 splats arranged in a grid
-numSplats = 100
+numSplats = 1
 means = np.zeros((numSplats, 3), dtype=np.float32)
 rotations = np.zeros((numSplats, 4), dtype=np.float32)
 scales = np.zeros((numSplats, 3), dtype=np.float32)
 opacities = np.zeros((numSplats, 1), dtype=np.float32)
 colours = np.zeros((numSplats, 3), dtype=np.float32)
-
-# Arrange the splats in a grid
-for i in range(numSplats):
-    means[i] = np.array([i % 10, i // 10, 0], dtype=np.float32)
-    rotations[i] = np.array([0, 0, 0, 1], dtype=np.float32)
-    scales[i] = np.array([0.1, 0.1, 0.1], dtype=np.float32)
-    opacities[i] = np.array([0.5], dtype=np.float32)
-    colours[i] = np.array([1, 0, 0], dtype=np.float32)
+i = 0
+means[i] = np.array([0,0, 0], dtype=np.float32)
+quaternion = [ 0.6502878, 0, 0, -0.7596879 ]
+rotations[i] = np.array(quaternion, dtype=np.float32)
+scales[i] = np.array([0.5, 0.1, 0.1], dtype=np.float32)
+opacities[i] = np.array([0.9], dtype=np.float32)
+colours[i] = np.array([1, 0, 0], dtype=np.float32)
 
 # Save the ply file
 save_ply("models/gridSplats.ply", means, rotations, scales, opacities, colours)
