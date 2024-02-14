@@ -62,19 +62,22 @@ class Splats
 
         int numSplats;
         int numSplatsPostCull;
-        std::vector<glm::vec3> means3D;
+        std::vector<glm::vec4> means3D;
         std::vector<glm::vec3> colours;
         std::vector<float> sphericalHarmonics;
         std::vector<float> opacities;
         std::vector<glm::vec3> scales;
         std::vector<glm::vec4> rotations;
-        std::vector<std::array<float, 6>> covarianceMatrices;
+        std::vector<float> covarianceMatrices;
 
 
 
     private:
         //function to load splats from file
         void loadSplats(const std::string& filePath);
+
+        void preprocessTemp(glm::mat4 viewMatrix, int width, int height, float focal_x, float focal_y, float tan_fov_x,
+                            float tan_fov_y, glm::mat4 vpMatrix);
 
         //function to compute the 3D covariance matrix
         void computeCovarianceMatrices();
@@ -102,6 +105,9 @@ class Splats
         GLuint intermediateBuffer;
         GLuint histogramBuffer;
         GLuint binsBuffer;
+
+        GLuint depthBuffer;
+        GLuint boundingRadiiBuffer;
 
 
         //not used for now
@@ -134,12 +140,12 @@ public:
     //function to print the splat's projected means in order of indices
     void printProjectedMeansByIndex();
 
-    void cpuRender(glm::mat4 viewMatrix, glm::mat3 rotationMatrix, int width, int height, float focal_x, float focal_y,
-                   float tan_fov_x, float tan_fov_y, glm::mat4 vpMatrix);
+    void cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, float focal_y, float tan_fov_x,
+                   float tan_fov_y, glm::mat4 vpMatrix);
     void cpuProjectSplats(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height);
     void simplifiedDraw(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height);
     std::vector<glm::vec2> projectedMeans;
-    std::vector<float> depthBuffer;
+    std::vector<float> depthVector;
     std::vector<std::vector<glm::vec4>> image;
     std::vector<glm::vec3> conics;
     glm::vec3 get2DCovariance(glm::mat3 covarianceMatrix, glm::vec3 projectedMean, glm::mat3 rotationMatrix);

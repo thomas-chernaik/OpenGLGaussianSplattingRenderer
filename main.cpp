@@ -37,17 +37,19 @@ int main()
 
 
     //initialise camera
-    Camera camera(5.0f, 0.5f, 0.0f);
+    Camera camera(5.0f, 0.5f, -4.0f);
     //make the camera look down a bit
     camera.rotateDown(20.0f);
     //rotate camera 40 degrees
-    camera.rotateRight(90.0f);
+    camera.rotateRight(40.0f);
     camera.update();
 
     Splats splats("models/point_cloud.ply");
     //splats.simplifiedDraw(camera.getProjectionMatrix() * camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
     //splats.printProjectedMeans();
-    splats.cpuRender(camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight(),camera.getFocalX(), camera.getFocalY(), camera.getTanFovy(), camera.getTanFovx(), camera.getProjectionMatrix() * camera.getViewMatrix());
+    splats.cpuRender(camera.getViewMatrix(), camera.getWidth(), camera.getHeight(), camera.getFocalX(),
+                     camera.getFocalY(), camera.getTanFovy(), camera.getTanFovx(),
+                     camera.getProjectionMatrix() * camera.getViewMatrix());
     /*
     //render image
     //preprocess splats
