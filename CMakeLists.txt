@@ -8,6 +8,11 @@ find_package(GLEW REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(GTest REQUIRED)
 
+#Add the stb_image_write library
+add_library(stb_image_write INTERFACE)
+target_include_directories(stb_image_write INTERFACE include)
+
+
 # Add the include directories for the libraries
 include_directories("include")
 
@@ -26,8 +31,13 @@ add_executable(diss main.cpp
 add_executable(tests tests/sortTests.cpp
         include/utils.h
         include/sort.h
+        include/Splats.h
+        include/Camera.h
         src/sort.cpp
-        src/utils.cpp)
+        src/utils.cpp
+        src/Splats.cpp
+        src/Camera.cpp
+        tests/plyParseTests.cpp)
 
 # Include directories for GLEW and GLFW
 target_include_directories(diss PRIVATE ${GLEW_INCLUDE_DIRS} ${GLFW_INCLUDE_DIRS})
@@ -37,6 +47,6 @@ target_include_directories(tests PRIVATE ${GTEST_INCLUDE_DIRS} ${GLEW_INCLUDE_DI
 # Link libraries (OpenGL, GLEW, and GLFW)
 target_link_libraries(diss PRIVATE ${OPENGL_LIBRARIES} GLEW::GLEW glfw)
 
-target_link_libraries(tests PRIVATE ${GTEST_LIBRARIES} GLEW::GLEW glfw)
+target_link_libraries(tests PRIVATE GLEW::GLEW glfw ${GTEST_LIBRARIES} ${OPENGL_LIBRARIES})
 # Set C++ standard to C++11 (or higher if needed)
 set_property(TARGET diss PROPERTY CXX_STANDARD 11)

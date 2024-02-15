@@ -169,6 +169,7 @@ void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sort
                    GLuint intermediateBuffer, GLuint orderBuffer, GLuint histogramBuffer, int size, int workGroupCount,
                    int workGroupSize)
 {
+    std::cout << "Sorting " << size << " numbers" << std::endl;
     //create query object
     GLuint startTimeQuery, endTimeQuery;
     glGenQueries(1, &startTimeQuery);
@@ -181,7 +182,7 @@ void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sort
     glQueryCounter(startTimeQuery, GL_TIMESTAMP);
 
     //run the sort
-    for(int i=0; i<7; i++)
+    for(int i=0; i<8; i++)
     {
         //generate the histograms
         glUseProgram(histogramProgram);

@@ -37,16 +37,26 @@ int main()
 
 
     //initialise camera
-    Camera camera(0.0f, 0.0f, -10.0f);
+    Camera camera(5.0f, 0.5f, -4.0f);
+    //make the camera look down a bit
+    camera.rotateDown(20.0f);
+    //rotate camera 40 degrees
+    camera.rotateRight(40.0f);
     camera.update();
 
     Splats splats("models/point_cloud.ply");
-
+    //splats.simplifiedDraw(camera.getProjectionMatrix() * camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
+    //splats.printProjectedMeans();
+    splats.cpuRender(camera.getViewMatrix(), camera.getWidth(), camera.getHeight(), camera.getFocalX(),
+                     camera.getFocalY(), camera.getTanFovy(), camera.getTanFovx(),
+                     camera.getProjectionMatrix() * camera.getViewMatrix());
+    /*
     //render image
     //preprocess splats
     std::cout << "Preprocessing splats" << std::endl;
 
     splats.preprocess( camera.getProjectionMatrix() * camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
+    //DEBUG: output the projected means
 
     //duplicate splats
     //start timer query
@@ -60,23 +70,26 @@ int main()
     GLuint64 timeElapsed;
     glGetQueryObjectui64v(timerQuery, GL_QUERY_RESULT, &timeElapsed);
     std::cout << "Duplicating splats took " << timeElapsed / 1000000.0 << " milliseconds" << std::endl;
-
+    std::cout << "Projected means" << std::endl;
+    //splats.printProjectedMeansByIndex();
     //sort splats
     std::cout << "Sorting splats" << std::endl;
     splats.sort();
+    //splats.printProjectedMeansByIndex();
 
     //compute bins
     std::cout << "Computing bins" << std::endl;
     splats.computeBins();
 
+
     //draw splats
     std::cout << "Drawing splats" << std::endl;
     glBeginQuery(GL_TIME_ELAPSED, timerQuery);
-    splats.draw(nullptr, nullptr, nullptr, nullptr, nullptr, camera.getWidth(), camera.getHeight());
+    splats.draw(camera.getWidth(), camera.getHeight());
     glEndQuery(GL_TIME_ELAPSED);
     glGetQueryObjectui64v(timerQuery, GL_QUERY_RESULT, &timeElapsed);
     std::cout << "Drawing splats took " << timeElapsed / 1000000.0 << " milliseconds" << std::endl;
-
+*/
     //display window
     while (!glfwWindowShouldClose(window)) {
         //resize window to camera size
@@ -84,9 +97,11 @@ int main()
         //clear window
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         //display splats
+        //splats.simplifiedDraw(camera.getProjectionMatrix() * camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
         splats.display();
         //swap buffers
         glfwSwapBuffers(window);
+        //camera.getInput(window);
 
         //poll events
         glfwPollEvents();

@@ -196,8 +196,7 @@ TEST(SortTest, SortTest) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, ascendingNumbers.size() * sizeof(int), ascendingNumbers.data(), GL_STATIC_DRAW);
     //fill the output buffer with the same ascending numbers
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, outputBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, ascendingNumbers.size() * sizeof(int), ascendingNumbers.data(), GL_STATIC_DRAW);
-
+    glBufferData(GL_SHADER_STORAGE_BUFFER, ascendingNumbers.size() * sizeof(int), nullptr, GL_STATIC_DRAW);
 
     //create the histogram buffer to use later
     int histogramSize = 16 * 8*256 + 16;
