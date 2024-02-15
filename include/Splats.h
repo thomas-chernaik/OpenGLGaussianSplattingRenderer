@@ -126,6 +126,7 @@ class Splats
         //simplified draw program
         GLuint simplifiedDrawProgram;
 
+
         //stuff for displaying
         GLuint vao;
         GLuint vbo;

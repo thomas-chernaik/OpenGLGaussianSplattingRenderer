@@ -172,6 +172,7 @@ void Splats::loadShaders()
     //load the simplified draw shader
     simplifiedDrawProgram = loadAndLinkShader("simplifiedVersion");
 
+
 }
 
 void Splats::loadSplats(const std::string &filePath)
@@ -704,6 +705,7 @@ void Splats::computeBins()
 
     //run the shader
     glDispatchCompute(numSplatsPostCull / 256, 1, 1);
+
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     //run the prefix sum on the bins
     //bind the shader
