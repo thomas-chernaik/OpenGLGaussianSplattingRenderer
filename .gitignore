@@ -7,3 +7,6 @@ valgrind.log
 
 /models/
 /models/test/
+
+cpuRender.png
+cpuNumSplatsPerPixel.png
