@@ -845,9 +845,15 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     std::vector<glm::vec4> projectedCovariances(numSplats);
     //vector for the bounding radii of the splats
     std::vector<float> boundingRadii(numSplats);
+    int bins[256];
+    for (int i = 0; i < 256; i++)
+    {
+        bins[i] = 0;
+    }
     int numSplatsCulled = 0;
     double timer = glfwGetTime();
-    /*
+    int tileWidth = width / 16;
+    int tileHeight = height / 16;
     // for each splat, project the mean
     for (int i = 0; i < numSplats; i++)
     {
@@ -918,13 +924,6 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
         projectedMean /= fmax(projectedMean[3], 0.0001f);
         //store the depth
         //TODO: encode the depths into an int so we can store them in fewer bits
-        //if the pixel is off the screen, set the depth to a large number
-        if (projectedMean[0] < -1 || projectedMean[0] > 1 || projectedMean[1] < -1 || projectedMean[1] > 1)
-        {
-            depthVector[i] = 1000000;
-            numSplatsCulled++;
-        } else
-            depthVector[i] = projectedMean[2];
         //convert to screen space
         projectedMean = (projectedMean + 1.f) * 0.5f;
         //convert to pixel space
@@ -932,7 +931,31 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
         projectedMean[1] *= height;
         //store the projected mean
         projectedMeans[i] = glm::vec2(projectedMean[0], projectedMean[1]);
-    }*/
+
+        //if projected mean x or y are less than 0, or greater than the width or height, continue
+        if(projectedMean.x < 0 || projectedMean.x > width || projectedMean.y < 0 || projectedMean.y > height)
+        {
+            depthVector[i] = 1000000;
+            numSplatsCulled++;
+            continue;
+        }
+
+        //calculate the tile the splat is in
+        int tileX = projectedMean[0] / tileWidth;
+        int tileY = projectedMean[1] / tileHeight;
+        //calculate the bin the splat is in
+        int tileIndex = tileY * 16 + tileX;
+        bins[tileIndex]++;
+
+        depthVector[i] = projectedMean[2];
+
+    }
+    //prefix sum the bins
+    for (int i = 1; i < 256; i++)
+    {
+        bins[i] += bins[i - 1];
+    }
+    /*
     // GPU pre-processing
 
 
@@ -975,7 +998,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
         //store in the vector
         depthVector[i] = dv;
     }
-    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);*/
 
     std::cout << "Time taken to project means: " << glfwGetTime() - timer << std::endl;
     timer = glfwGetTime();
@@ -987,6 +1010,50 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     std::sort(indices.begin(), indices.end(), [&depthVector](int i1, int i2)
     { return depthVector[i1] < depthVector[i2]; });
     std::cout << "Time taken to sort: " << glfwGetTime() - timer << std::endl;
+    /*
+    //tiled per pixel rasterisation
+    timer = glfwGetTime();
+    for(int y=0; y<height; y++)
+    {
+        for(int x=0; x<width; x++)
+        {
+            glm::vec2 pixel = glm::vec2(x, y);
+            int tileX = x / tileWidth;
+            int tileY = y / tileHeight;
+            int tileIndex = tileY * 16 + tileX;
+            int start = (tileIndex == 0) ? 0 : bins[tileIndex - 1];
+            int end = bins[tileIndex];
+            for(int i=start; i<end; i++)
+            {
+                int index = indices[i];
+                glm::vec2 projectedMean = projectedMeans[index];
+                //if projected mean x or y are less than 0, or greater than the width or height, continue
+                if(projectedMean.x < 0 || projectedMean.x > width || projectedMean.y < 0 || projectedMean.y > height)
+                {
+                    continue;
+                }
+                float radius = boundingRadii[index];
+                //check if the pixel is in the bounding box
+                if (x >= projectedMean[0] - radius && x <= projectedMean[0] + radius &&
+                    y >= projectedMean[1] - radius && y <= projectedMean[1] + radius)
+                {
+                    glm::vec4 conic = projectedCovariances[index];
+                    //get the value of the conic at the distance
+                    float power = -0.5f * (conic.x * (x - projectedMean.x) * (x - projectedMean.x) +
+                                           conic.z * (y - projectedMean.y) * (y - projectedMean.y)) -
+                                  conic.y * (x - projectedMean.x) * (y - projectedMean.y);
+                    float alpha = std::min(0.99f, exp(power));
+                    //add the value to the pixel
+                    image[x][y] = alphaBlend(image[x][y], glm::vec4(colours[index], alpha));
+                    //if the pixel alpha is high enough, break
+                    if(image[x][y].a > 0.99f)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+    }*/
     //per pixel rasterisation
     /*
     for(int y=0; y < 10; y++)
@@ -1022,8 +1089,8 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
                 }
             }
         }
-    }
-*/
+    }*/
+
     std::cout << "num splats culled: " << numSplatsCulled << std::endl;
     std::cout << "num splats to render: " << numSplats - numSplatsCulled << std::endl;
     //vector to count the number of splats contributing to each pixel
@@ -1097,41 +1164,41 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     saveImage(image, "cpuRender.png");
     std::cout << "Finished rendering on the cpu" << std::endl;
     //print the mean, median and max number of splats per pixel
-    int total = 0;
-    int max = 0;
-    for (int x = 0; x < width; x++)
-    {
-        for (int y = 0; y < height; y++)
-        {
-            total += numSplatsPerPixel[x][y];
-            if (numSplatsPerPixel[x][y] > max)
-            {
-                max = numSplatsPerPixel[x][y];
-            }
-            image[x][y] = (float) numSplatsPerPixel[x][y] * 3 * glm::vec4(1, 1, 1, 1);
-
-            image[x][y].a = 1;
-        }
-    }
-    //flatten out the number of splats per pixel
-    std::vector<int> flattenedNumSplatsPerPixel(width * height);
-    for (int x = 0; x < width; x++)
-    {
-        for (int y = 0; y < height; y++)
-        {
-            flattenedNumSplatsPerPixel[x * height + y] = numSplatsPerPixel[x][y];
-        }
-    }
-    //get the median
-    std::sort(flattenedNumSplatsPerPixel.begin(), flattenedNumSplatsPerPixel.end());
-    int median = flattenedNumSplatsPerPixel[flattenedNumSplatsPerPixel.size() / 2];
-    //get the 90th percentile
-    int percentile = flattenedNumSplatsPerPixel[flattenedNumSplatsPerPixel.size() * 0.9];
-    saveImage(image, "cpuNumSplatsPerPixel.png");
-    std::cout << "Mean number of splats per pixel: " << total / (width * height) << std::endl;
-    std::cout << "Max number of splats per pixel: " << max << std::endl;
-    std::cout << "Median number of splats per pixel: " << median << std::endl;
-    std::cout << "90th percentile number of splats per pixel: " << percentile << std::endl;
+//    int total = 0;
+//    int max = 0;
+//    for (int x = 0; x < width; x++)
+//    {
+//        for (int y = 0; y < height; y++)
+//        {
+//            total += numSplatsPerPixel[x][y];
+//            if (numSplatsPerPixel[x][y] > max)
+//            {
+//                max = numSplatsPerPixel[x][y];
+//            }
+//            image[x][y] = (float) numSplatsPerPixel[x][y] * 3 * glm::vec4(1, 1, 1, 1);
+//
+//            image[x][y].a = 1;
+//        }
+//    }
+//    //flatten out the number of splats per pixel
+//    std::vector<int> flattenedNumSplatsPerPixel(width * height);
+//    for (int x = 0; x < width; x++)
+//    {
+//        for (int y = 0; y < height; y++)
+//        {
+//            flattenedNumSplatsPerPixel[x * height + y] = numSplatsPerPixel[x][y];
+//        }
+//    }
+//    //get the median
+//    std::sort(flattenedNumSplatsPerPixel.begin(), flattenedNumSplatsPerPixel.end());
+//    int median = flattenedNumSplatsPerPixel[flattenedNumSplatsPerPixel.size() / 2];
+//    //get the 90th percentile
+//    int percentile = flattenedNumSplatsPerPixel[flattenedNumSplatsPerPixel.size() * 0.9];
+//    saveImage(image, "cpuNumSplatsPerPixel.png");
+//    std::cout << "Mean number of splats per pixel: " << total / (width * height) << std::endl;
+//    std::cout << "Max number of splats per pixel: " << max << std::endl;
+//    std::cout << "Median number of splats per pixel: " << median << std::endl;
+//    std::cout << "90th percentile number of splats per pixel: " << percentile << std::endl;
 
 }
 
