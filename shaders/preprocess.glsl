@@ -66,15 +66,12 @@ void main()
     // Project the mean to 2D
     vec4 projectedMean = VPMatrix * mean;
     projectedMean /= max(projectedMean.w, 0.0001);
-    //store the depth
     //if the pixel is off screen, give it a big depth (100000)
     if (projectedMean.x < -1.0 || projectedMean.x > 1.0 || projectedMean.y < -1.0 || projectedMean.y > 1.0)
     {
         depthBuffer.data[i] = 100000.0;
-        //means2D.data[i] = vec2(projectedMean.x, screenWidth);
         return;
     }
-    depthBuffer.data[i] = projectedMean.z;
     //convert the mean to screen space
     projectedMean = (projectedMean + 1.0) * 0.5;
     projectedMean.x *= screenWidth;
@@ -134,6 +131,13 @@ void main()
     float lambda1 = middle + sqrt(max(0.1, middle * middle - determinant));
     float lambda2 = middle - sqrt(max(0.1, middle * middle - determinant));
     boundingRadii.data[i] = ceil(3.0 * sqrt(max(lambda1, lambda2)));
+
+    float tileWidth = screenWidth / 16.0;
+    float tileHeight = screenHeight / 16.0;
+    int tileX = int(projectedMean.x / tileWidth);
+    int tileY = int(projectedMean.y / tileHeight);
+    float tileIndex = tileY * 16.0 + tileX;
+    depthBuffer.data[i] = projectedMean.z + tileIndex;
 
 
 }

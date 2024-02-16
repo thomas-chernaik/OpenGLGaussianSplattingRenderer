@@ -693,7 +693,7 @@ void Splats::computeBins()
     //bind the shader
     glUseProgram(binProgram);
     //bind the buffers
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, keyBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, depthBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, binsBuffer);
     //initialise the bins to 0
     std::vector<GLuint> zero(256, 0);
@@ -701,10 +701,10 @@ void Splats::computeBins()
     glBufferData(GL_SHADER_STORAGE_BUFFER, 256 * sizeof(GLuint), zero.data(), GL_DYNAMIC_DRAW);
 
     //set the length of the array of keys
-    glUniform1i(glGetUniformLocation(binProgram, "length"), numSplatsPostCull);
+    glUniform1i(glGetUniformLocation(binProgram, "length"), numSplats);
 
     //run the shader
-    glDispatchCompute(numSplatsPostCull / 256, 1, 1);
+    glDispatchCompute(numSplats / 256, 1, 1);
 
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     //run the prefix sum on the bins
@@ -854,6 +854,8 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     double timer = glfwGetTime();
     float tileWidth = width / 16.f;
     float tileHeight = height / 16.f;
+    /*
+
     // for each splat, project the mean
     for (int i = 0; i < numSplats; i++)
     {
@@ -955,13 +957,14 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     for (int i = 1; i < 256; i++)
     {
         bins[i] += bins[i - 1];
-    }
-    /*
+    }*/
+
     // GPU pre-processing
 
 
     timer = glfwGetTime();
     preprocessTemp(viewMatrix, width, height, focal_x, focal_y, tan_fov_x, tan_fov_y, vpMatrix);
+    computeBins();
     std::cout << "Time taken to preprocess: " << glfwGetTime() - timer << std::endl;
     // get the buffers from the GPU into the vectors
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedMeansBuffer);
@@ -999,7 +1002,17 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
         //store in the vector
         depthVector[i] = dv;
     }
-    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);*/
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+
+
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, binsBuffer);
+    GLuint *binsptr = (GLuint *) glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    for (int i = 0; i < 256; i++)
+    {
+        bins[i] = binsptr[i];
+    }
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 
     std::cout << "Time taken to project means: " << glfwGetTime() - timer << std::endl;
     timer = glfwGetTime();
