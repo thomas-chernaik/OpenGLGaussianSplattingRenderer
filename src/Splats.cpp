@@ -852,8 +852,8 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     }
     int numSplatsCulled = 0;
     double timer = glfwGetTime();
-    int tileWidth = width / 16;
-    int tileHeight = height / 16;
+    float tileWidth = width / 16.f;
+    float tileHeight = height / 16.f;
     // for each splat, project the mean
     for (int i = 0; i < numSplats; i++)
     {
@@ -899,6 +899,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
         float inverseDeterminant = 1.f / determinant;
         glm::vec4 conic = glm::vec4(covariance2DCompressed.z, -covariance2DCompressed.y, covariance2DCompressed.x, 1.0) *
                           inverseDeterminant;
+        conic.w = opacities[i];
         //store the conic
         projectedCovariances[i] = conic;
         //projectedCovariances[i] = glm::vec4(viewMatrix3[0][0], viewMatrix3[0][1], viewMatrix3[0][2], viewMatrix3[1][0]);
@@ -947,7 +948,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
         int tileIndex = tileY * 16 + tileX;
         bins[tileIndex]++;
 
-        depthVector[i] = projectedMean[2];
+        depthVector[i] = projectedMean[2] + tileIndex;
 
     }
     //prefix sum the bins
@@ -1010,14 +1011,16 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     std::sort(indices.begin(), indices.end(), [&depthVector](int i1, int i2)
     { return depthVector[i1] < depthVector[i2]; });
     std::cout << "Time taken to sort: " << glfwGetTime() - timer << std::endl;
-    /*
+
     //tiled per pixel rasterisation
     timer = glfwGetTime();
     for(int y=0; y<height; y++)
     {
         for(int x=0; x<width; x++)
         {
-            glm::vec2 pixel = glm::vec2(x, y);
+            glm::vec2 pixelPosition = glm::vec2(x, y);
+            //get the pixel
+            glm::vec4 &pixel = image[x][y];
             int tileX = x / tileWidth;
             int tileY = y / tileHeight;
             int tileIndex = tileY * 16 + tileX;
@@ -1037,23 +1040,45 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
                 if (x >= projectedMean[0] - radius && x <= projectedMean[0] + radius &&
                     y >= projectedMean[1] - radius && y <= projectedMean[1] + radius)
                 {
+
+
                     glm::vec4 conic = projectedCovariances[index];
+                    //get the position of the mean in screen space
+                    glm::vec2 meanPosition = glm::vec2(projectedMean[0], projectedMean[1]);
+                    glm::vec2 distance = glm::vec2(x, y) - meanPosition;
                     //get the value of the conic at the distance
-                    float power = -0.5f * (conic.x * (x - projectedMean.x) * (x - projectedMean.x) +
-                                           conic.z * (y - projectedMean.y) * (y - projectedMean.y)) -
-                                  conic.y * (x - projectedMean.x) * (y - projectedMean.y);
-                    float alpha = std::min(0.99f, exp(power));
+                    float power = -0.5f * (conic.x * distance.x * distance.x + conic.z * distance.y * distance.y) -
+                                  conic.y * distance.x * distance.y;
+                    if(power > 0.f)
+                    {
+                        continue;
+                    }
+                    float alpha = std::min(0.99f, exp(power) * conic.w);
+                    //if the alpha is less than the bit depth of the image, we want to ignore it
+                    //we can reduce the number of computations by increasing this, but some pretty horrific artifacts emerge
+                    //these artifacts are due to the "inside" of objects having random noise inside, so could be overcome
+                    //by better training.
+                    if (alpha < 1.f/255.f)
+                    {
+                        continue;
+                    }
+
+                    //alpha = 1;
                     //add the value to the pixel
-                    image[x][y] = alphaBlend(image[x][y], glm::vec4(colours[index], alpha));
-                    //if the pixel alpha is high enough, break
-                    if(image[x][y].a > 0.99f)
+                    //only add if number of splats per pixel is less than 10
+
+                    pixel = alphaBlend(pixel, glm::vec4(colours[index], alpha));
+                    //if the alpha is high enough, we are done with this pixel
+                    if (pixel.a > 0.99f)
                     {
                         break;
                     }
+
+
                 }
             }
         }
-    }*/
+    }
     //per pixel rasterisation
     /*
     for(int y=0; y < 10; y++)
@@ -1089,7 +1114,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
                 }
             }
         }
-    }*/
+    }
 
     std::cout << "num splats culled: " << numSplatsCulled << std::endl;
     std::cout << "num splats to render: " << numSplats - numSplatsCulled << std::endl;
@@ -1158,7 +1183,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
                 }
             }
         }
-    }
+    }*/
     std::cout << "Time taken to render: " << glfwGetTime() - timer << std::endl;
     //store the image in a png
     saveImage(image, "cpuRender.png");
