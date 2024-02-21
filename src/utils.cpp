@@ -53,7 +53,9 @@ std::vector<float> createRandomNumbersFloat(int size) {
     }
     std::vector<float> randomNumbers(size);
     for (int i = 0; i < size; i++) {
-        randomNumbers[i] = (float)rand() / RAND_MAX;
+        //add a random number between 0 and 1, and a random number between 0 and 255
+        int random = rand() % 255;
+        randomNumbers[i] = (float)rand() / RAND_MAX + random;
     }
     return randomNumbers;
 }
