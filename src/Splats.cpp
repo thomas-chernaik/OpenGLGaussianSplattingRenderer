@@ -838,13 +838,18 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     //create the image to render to, as a 2D vector of vec4s
     std::vector<std::vector<glm::vec4>> image(width, std::vector<glm::vec4>(height, glm::vec4(0, 0, 0, 0)));
     //vector for the depth buffer for each splat
-    std::vector<float> depthVector(numSplats);
+    std::vector<float> depthVector(numSplats * 2);
     //vector for the pixel-projected means
     std::vector<glm::vec2> projectedMeans(numSplats);
     //vector for the pixel-projected 2D covariance matrices
     std::vector<glm::vec4> projectedCovariances(numSplats);
     //vector for the bounding radii of the splats
     std::vector<float> boundingRadii(numSplats);
+    //vector for the index of the splat
+    std::vector<int> splatKeys(numSplats * 2);
+    //vector for the index of the depth buffer (to sort the splats)
+    std::vector<int> indices(numSplats * 2);
+
     int bins[256];
     for (int i = 0; i < 256; i++)
     {
@@ -854,11 +859,13 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     double timer = glfwGetTime();
     float tileWidth = width / 16.f;
     float tileHeight = height / 16.f;
-    /*
+    int numDupes = 0;
+#ifndef GPUPREPROCESS
 
     // for each splat, project the mean
     for (int i = 0; i < numSplats; i++)
     {
+        indices[i] = i;
         //project the mean
         glm::vec3 t = viewMatrix * means3D[i];
         float limx = -1.3f * tan_fov_x;
@@ -943,22 +950,46 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
             continue;
         }
 
-        //calculate the tile the splat is in
+        int tileMinX = fmax(0, (int) (projectedMean[0] - radius) / tileWidth);
+        int tileMaxX = fmin(15, (int) (projectedMean[0] + radius) / tileWidth);
+        int tileMinY = fmax(0, (int) (projectedMean[1] - radius) / tileHeight);
+        int tileMaxY = fmin(15, (int) (projectedMean[1] + radius) / tileHeight);
+        //calculate the main tile the splat is in
         int tileX = projectedMean[0] / tileWidth;
         int tileY = projectedMean[1] / tileHeight;
         //calculate the bin the splat is in
         int tileIndex = tileY * 16 + tileX;
         bins[tileIndex]++;
-
         depthVector[i] = projectedMean[2] + tileIndex;
+        splatKeys[i] = i;
+
+        //for each tile the splat is in, duplicate the splat
+        for(int y=tileMinY; y<=tileMaxY; y++)
+        {
+            for(int x=tileMinX; x<=tileMaxX; x++)
+            {
+                if(x == tileX && y == tileY)
+                {
+                    continue;
+                }
+                tileIndex = y * 16 + x;
+                bins[tileIndex]++;
+                int dupedIndex = numSplats + numDupes++;
+                depthVector[dupedIndex] = projectedMean[2] + tileIndex;
+                splatKeys[dupedIndex] = i;
+                indices[dupedIndex] = dupedIndex;
+            }
+        }
 
     }
+    std::cout << numDupes << " duplicates" << std::endl;
     //prefix sum the bins
     for (int i = 1; i < 256; i++)
     {
         bins[i] += bins[i - 1];
-    }*/
-
+    }
+#endif
+#ifdef GPUPREPROCESS
     // GPU pre-processing
 
 
@@ -1015,13 +1046,11 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 
     std::cout << "Time taken to project means: " << glfwGetTime() - timer << std::endl;
+#endif
     timer = glfwGetTime();
     //sort the splats by depth
-    std::vector<int> indices(numSplats);
-    //fill the indices vector with the numbers 0 to numSplats
-    std::iota(indices.begin(), indices.end(), 0);
     //sort the indices by the depth buffer
-    std::sort(indices.begin(), indices.end(), [&depthVector](int i1, int i2)
+    std::sort(indices.begin(), indices.begin() + numSplats + numDupes, [&depthVector](int i1, int i2)
     { return depthVector[i1] < depthVector[i2]; });
     std::cout << "Time taken to sort: " << glfwGetTime() - timer << std::endl;
 
@@ -1041,7 +1070,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
             int end = bins[tileIndex];
             for(int i=start; i<end; i++)
             {
-                int index = indices[i];
+                int index = splatKeys[indices[i]];
                 glm::vec2 projectedMean = projectedMeans[index];
                 //if projected mean x or y are less than 0, or greater than the width or height, continue
                 if(projectedMean.x < 0 || projectedMean.x > width || projectedMean.y < 0 || projectedMean.y > height)
