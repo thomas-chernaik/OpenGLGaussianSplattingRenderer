@@ -41,6 +41,8 @@ Splats::~Splats()
     glDeleteBuffers(1, &binsBuffer);
     glDeleteBuffers(1, &depthBuffer);
     glDeleteBuffers(1, &boundingRadiiBuffer);
+    glDeleteBuffers(1, &numDupedBuffer);
+    glDeleteBuffers(1, &splatKeysBuffer);
     //delete the texture
     glDeleteTextures(1, &texture);
     //delete the shaders
@@ -76,6 +78,8 @@ void Splats::loadToGPU()
     glGenBuffers(1, &projectedCovarianceBuffer);
     glGenBuffers(1, &depthBuffer);
     glGenBuffers(1, &boundingRadiiBuffer);
+    glGenBuffers(1, &numDupedBuffer);
+    glGenBuffers(1, &splatKeysBuffer);
     //bind the buffers and load the data
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, means3DBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, means3D.size() * sizeof(glm::vec4), means3D.data(), GL_STATIC_DRAW);
@@ -93,7 +97,7 @@ void Splats::loadToGPU()
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedCovarianceBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 4 * sizeof(float), nullptr, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, depthBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * sizeof(float), nullptr, GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * sizeof(float), nullptr, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, boundingRadiiBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * sizeof(float), nullptr, GL_STATIC_DRAW);
 
@@ -114,6 +118,15 @@ void Splats::loadToGPU()
     glGenBuffers(1, &binsBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, binsBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, 256 * sizeof(int), nullptr, GL_STATIC_DRAW);
+    //num culled buffer (buffer of uints, size 1)
+    glGenBuffers(1, &numDupedBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, numDupedBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(int), nullptr, GL_STATIC_DRAW);
+    //splat keys buffer (buffer of vec2s, size numSplats * 2)
+    glGenBuffers(1, &splatKeysBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, splatKeysBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numSplats * 2 * sizeof(glm::vec2), nullptr, GL_STATIC_DRAW);
+
 
     //create the texture to display
     glGenTextures(1, &texture);
@@ -313,7 +326,7 @@ void Splats::loadSplats(const std::string &filePath)
         //(1 / (1 + Math.exp(-rawVertex['opacity']))) * 255;
         opacity = (1 / (1 + exp(-opacity)));
         //increase count if opacity less than 1
-        if (opacity < 1)
+        if (opacity < (1.f/256.f))
         {
             count++;
         }
@@ -342,6 +355,7 @@ void Splats::loadSplats(const std::string &filePath)
         rotations.push_back(rotationVec);
 
     }
+    std::cout << "There are " << count << " splats with opacity less than 0.1" << std::endl;
     char c;
     file.read(&c, sizeof(char));
     //check we have reached the end of the file
@@ -414,7 +428,7 @@ void Splats::preprocess(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width,
             //std::cout << "key2: " << std::bitset<32>(key2) << std::endl;
             for(uint i=1; i<3; i++) {
                 if((key1 & (0xFF << i * 8)) != 0) {
-                    numDupes++;
+                    numDuplicates++;
                     std::cout << "Key" << key1 << std::endl;
                 }
             }
@@ -426,7 +440,7 @@ void Splats::preprocess(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width,
         //
 
     }
-    std::cout << "num duplicates: " << numDupes << std::endl;
+    std::cout << "num duplicates: " << numDuplicates << std::endl;
     std::cout << "num culled: " << numCulled << std::endl;
 #endif
 
@@ -491,9 +505,8 @@ void Splats::sort()
 {
     std::cout << "Sorting splats" << std::endl;
     double time = glfwGetTime();
-    GPURadixSort2(histogramProgram, prefixSumProgram, sortProgram, keyBuffer, intermediateBuffer, indexBuffer,
-                  histogramBuffer,
-                  numSplatsPostCull, 8, 256);
+    GPURadixSort2(histogramProgram, prefixSumProgram, sortProgram, depthBuffer, intermediateBuffer, indexBuffer,
+                  histogramBuffer, numSplats + numDuplicates, 8, 256);
     std::cout << "Finished sorting splats" << std::endl;
     std::cout << "Time taken to sort: " << glfwGetTime() - time << std::endl;
 
@@ -701,10 +714,10 @@ void Splats::computeBins()
     glBufferData(GL_SHADER_STORAGE_BUFFER, 256 * sizeof(GLuint), zero.data(), GL_DYNAMIC_DRAW);
 
     //set the length of the array of keys
-    glUniform1i(glGetUniformLocation(binProgram, "length"), numSplats);
+    glUniform1i(glGetUniformLocation(binProgram, "length"), numSplats + numDuplicates);
 
     //run the shader
-    glDispatchCompute(numSplats / 256, 1, 1);
+    glDispatchCompute((numSplats+numDuplicates) / 256, 1, 1);
 
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     //run the prefix sum on the bins
@@ -821,14 +834,30 @@ void Splats::preprocessTemp(glm::mat4 viewMatrix, int width, int height, float f
     glUniform1f(6, tan_fov_y);
     glUniformMatrix4fv(7, 1, GL_FALSE, &vpMatrix[0][0]);
     glUniform1ui(8, numSplats);
+    //set the atomic counter
+    glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 9, numDupedBuffer);
+    //set the atomic counter to 0
+    GLuint zero = 0;
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, numDupedBuffer);
+    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), &zero, GL_DYNAMIC_DRAW);
+
     //bind the output buffers
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, projectedMeansBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, depthBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, projectedCovarianceBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, boundingRadiiBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, indexBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, splatKeysBuffer);
     //run the shader
     glDispatchCompute(numSplats, 1, 1);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_ATOMIC_COUNTER_BARRIER_BIT);
+    //get the number of splats duplicated
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, numDupedBuffer);
+    GLuint *numDuped = (GLuint *) glMapBuffer(GL_ATOMIC_COUNTER_BUFFER, GL_READ_ONLY);
+    std::cout << "num duped: " << numDuped[0] << std::endl;
+    numDuplicates = numDuped[0];
+    glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);
+
 }
 
 void
@@ -859,9 +888,9 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     double timer = glfwGetTime();
     float tileWidth = width / 16.f;
     float tileHeight = height / 16.f;
-    int numDupes = 0;
+//#define GPUPREPROCESS
 #ifndef GPUPREPROCESS
-
+    numDuplicates = 0;
     // for each splat, project the mean
     for (int i = 0; i < numSplats; i++)
     {
@@ -947,6 +976,12 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
         {
             depthVector[i] = 1000000;
             numSplatsCulled++;
+            //set everything else to 0
+            projectedMeans[i] = glm::vec2(0, 0);
+            projectedCovariances[i] = glm::vec4(0, 0, 0, 0);
+            boundingRadii[i] = 0;
+            splatKeys[i] = 0;
+            indices[i] = i;
             continue;
         }
 
@@ -974,7 +1009,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
                 }
                 tileIndex = y * 16 + x;
                 bins[tileIndex]++;
-                int dupedIndex = numSplats + numDupes++;
+                int dupedIndex = numSplats + numDuplicates++;
                 depthVector[dupedIndex] = projectedMean[2] + tileIndex;
                 splatKeys[dupedIndex] = i;
                 indices[dupedIndex] = dupedIndex;
@@ -982,21 +1017,24 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
         }
 
     }
-    std::cout << numDupes << " duplicates" << std::endl;
+    std::cout << numDuplicates << " duplicates" << std::endl;
     //prefix sum the bins
     for (int i = 1; i < 256; i++)
     {
         bins[i] += bins[i - 1];
     }
 #endif
-#ifdef GPUPREPROCESS
+//#ifdef GPUPREPROCESS
     // GPU pre-processing
 
 
     timer = glfwGetTime();
     preprocessTemp(viewMatrix, width, height, focal_x, focal_y, tan_fov_x, tan_fov_y, vpMatrix);
-    computeBins();
     std::cout << "Time taken to preprocess: " << glfwGetTime() - timer << std::endl;
+    computeBins();
+    std::cout << "Time taken to preprocess and bin: " << glfwGetTime() - timer << std::endl;
+    sort();
+    std::cout << "Time taken to preprocess, bin and sort: " << glfwGetTime() - timer << std::endl;
     // get the buffers from the GPU into the vectors
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedMeansBuffer);
     float *projectedMeansptr = (float *) glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
@@ -1004,6 +1042,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     {
         auto pm = glm::vec2(projectedMeansptr[i * 2], projectedMeansptr[i * 2 + 1]);
         //store in the vector
+        assert(abs(projectedMeans[i].x - pm.x) < 0.01);
         projectedMeans[i] = pm;
     }
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
@@ -1012,6 +1051,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     for (int i = 0; i < numSplats; i++)
     {
         auto pc = glm::vec4 (projectedCovariancesptr[i * 4], projectedCovariancesptr[i * 4 + 1], projectedCovariancesptr[i * 4 + 2], projectedCovariancesptr[i * 4 + 3]);
+        assert(abs(projectedCovariances[i].x - pc.x) < 0.01);
         //store in the vector
         projectedCovariances[i] = pc;
     }
@@ -1021,15 +1061,18 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     for (int i = 0; i < numSplats; i++)
     {
         auto br = boundingRadiiptr[i];
+        assert(abs(boundingRadii[i] - br) < 0.01);
         //store in the vector
         boundingRadii[i] = br;
     }
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, depthBuffer);
     float *depthVectorptr = (float *) glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-    for (int i = 0; i < numSplats; i++)
+    for (int i = 0; i < numSplats + numDuplicates; i++)
     {
         auto dv = depthVectorptr[i];
+        //std::cout << i << std::endl;
+        //assert(abs(depthVector[i] - dv) < 0.01);
         //store in the vector
         depthVector[i] = dv;
     }
@@ -1041,18 +1084,52 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     GLuint *binsptr = (GLuint *) glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
     for (int i = 0; i < 256; i++)
     {
+        //assert(bins[i] == binsptr[i]);
         bins[i] = binsptr[i];
     }
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, indexBuffer);
+    int *indicesptr = (int *) glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    for (int i = 0; i < numSplats + numDuplicates; i++)
+    {
+        //assert(indices[i] == indicesptr[i]);
+        indices[i] = indicesptr[i];
+    }
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, splatKeysBuffer);
+    int *splatKeysptr = (int *) glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+    for (int i = 0; i < numSplats + numDuplicates   ; i++)
+    {
+        //assert(splatKeys[i] == splatKeysptr[i]);
+        splatKeys[i] = splatKeysptr[i];
+    }
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    //get the number of duplicates
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, numDupedBuffer);
+    GLuint *numDuped = (GLuint *) glMapBuffer(GL_ATOMIC_COUNTER_BUFFER, GL_READ_ONLY);
+    std::cout << "num duped: " << numDuped[0] << std::endl;
+    numDuplicates = numDuped[0];
 
     std::cout << "Time taken to project means: " << glfwGetTime() - timer << std::endl;
-#endif
+//#endif
     timer = glfwGetTime();
+    //see if the splats are sorted by depth
+#ifdef DEBUG
+    int errors = 0;
+    for (int i = 0; i < numSplats + numDuplicates - 1; i++)
+    {
+        if (depthVector[indices[i]] > depthVector[indices[i + 1]])
+        {
+            errors++;
+        }
+    }
+    std::cout << "Errors: " << errors << std::endl;
+#endif
     //sort the splats by depth
     //sort the indices by the depth buffer
-    std::sort(indices.begin(), indices.begin() + numSplats + numDupes, [&depthVector](int i1, int i2)
-    { return depthVector[i1] < depthVector[i2]; });
-    std::cout << "Time taken to sort: " << glfwGetTime() - timer << std::endl;
+//    std::sort(indices.begin(), indices.begin() + numSplats + numDuplicates, [&depthVector](int i1, int i2)
+//    { return depthVector[i1] < depthVector[i2]; });
+//    std::cout << "Time taken to sort: " << glfwGetTime() - timer << std::endl;
 
     //tiled per pixel rasterisation
     timer = glfwGetTime();

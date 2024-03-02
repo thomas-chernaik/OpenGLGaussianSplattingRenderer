@@ -61,6 +61,7 @@ class Splats
         void display();
 
         int numSplats;
+        int numDuplicates;
         int numSplatsPostCull;
         std::vector<glm::vec4> means3D;
         std::vector<glm::vec3> colours;
@@ -108,6 +109,8 @@ class Splats
 
         GLuint depthBuffer;
         GLuint boundingRadiiBuffer;
+        GLuint numDupedBuffer;
+        GLuint splatKeysBuffer;
 
 
         //not used for now

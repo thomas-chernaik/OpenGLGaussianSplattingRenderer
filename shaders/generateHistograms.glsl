@@ -4,7 +4,7 @@
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 //the input buffer of keys to be sorted
 layout (std430, binding = 0)  buffer InputBuffer {
-    uvec2 data[];
+    float data[];
 } inputBuffer;
 //the order buffer
 layout (std430, binding = 1) buffer OrderBuffer {
@@ -29,9 +29,6 @@ void main()
 {
     //the current segment we are sorting on
     uint segment = uint(segmentReadOnly);
-    //if the segment is more than 7 we need to sort on the x values, otherwise we need to sort on the y values
-    bool sortX = segment > 7;
-    segment -= sortX ? 8 : 0;
     //the start index of the section
     int startIdx = int(gl_GlobalInvocationID.x) * sectionSize;
     //the start index of the section in terms of keys
@@ -48,13 +45,9 @@ void main()
     uint index;
     //compute the local histogram
     for (int i = startIdx; i < startIdx + sectionSize; i++) {
-        uvec2 key = inputBuffer.data[orderBuffer.data[i]];
-        if(sortX)
-            //extract the bits we are sorting on (x values)
-            index = ((key.x) & mask) >> (segment * 4);
-        else
-            //extract the bits we are sorting on (y values
-            index = ((key.y) & mask) >> (segment * 4);
+        uint key = floatBitsToUint(inputBuffer.data[orderBuffer.data[i]]);
+        //extract the bits we are sorting on
+        index = ((key) & mask) >> (segment * 4);
         histogram[index]++;
     }
 

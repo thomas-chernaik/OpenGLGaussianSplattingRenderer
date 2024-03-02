@@ -47,6 +47,8 @@ std::vector<double> createRandomNumbersDouble(int size, int maxNumber) {
 //function to create random numbers to go in a buffer
 //return a vector floats
 std::vector<float> createRandomNumbersFloat(int size) {
+    //set the seed for the random number generator
+    srand(10);
     if(size < 1) {
         std::cerr << "Error: size must be greater than 0" << std::endl;
         return std::vector<float>();
@@ -212,6 +214,7 @@ std::vector<glm::uvec2> createRandomNumbersVec2(int size, int maxNumber) {
 
     return randomNumbers;
 }
+
 
 
 #endif //DISS_UTILS_H

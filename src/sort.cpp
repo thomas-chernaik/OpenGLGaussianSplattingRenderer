@@ -220,7 +220,10 @@ void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sort
         orderBuffer = intermediateBuffer;
         intermediateBuffer = temp;
     }
-    //intermediateBuffer;
+    //swap the output and order buffers
+    GLuint temp = orderBuffer;
+    orderBuffer = intermediateBuffer;
+    intermediateBuffer = temp;
     //stop the timer
     glQueryCounter(endTimeQuery, GL_TIMESTAMP);
 
