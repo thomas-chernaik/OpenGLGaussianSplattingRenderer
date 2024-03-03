@@ -84,7 +84,7 @@ void Splats::loadToGPU()
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, means3DBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, means3D.size() * sizeof(glm::vec4), means3D.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, coloursBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, colours.size() * sizeof(glm::vec3), colours.data(), GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, colours.size() * sizeof(glm::vec4), colours.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, sphericalHarmonicsBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, sphericalHarmonics.size() * sizeof(float), sphericalHarmonics.data(),
                  GL_STATIC_DRAW);
@@ -311,7 +311,7 @@ void Splats::loadSplats(const std::string &filePath)
             colour[i] = (0.5 + (SH_C0 * colour[i])) * 255.f;
             //colour[i] = exp(colour[i]);
         }
-        glm::vec3 colourVec(colour[0], colour[1], colour[2]);
+        glm::vec4 colourVec(colour[0], colour[1], colour[2], 1.f);
         colours.push_back(colourVec);
         //read the spherical harmonics (44 floats)
         float sphericalHarmonic[45];
@@ -512,7 +512,7 @@ void Splats::sort()
 
 }
 
-void Splats::draw(int width, int height)
+void Splats::draw(int width, int height, float tileWidth, float tileHeight)
 {
     //the draw function needs to following inputs:
     //the start and end of each bin for each tile (this can be found at the end of the histogram buffer and the numSplatsPostCull)
@@ -541,12 +541,16 @@ void Splats::draw(int width, int height)
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, projectedCovarianceBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, coloursBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, indexBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, splatKeysBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, boundingRadiiBuffer);
     //bind the output screen sized buffer (a image2D)
     glBindImageTexture(0, texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
     //set the uniforms
     glUniform1i(glGetUniformLocation(drawProgram, "numSplats"), numSplatsPostCull);
     glUniform1i(glGetUniformLocation(drawProgram, "screenWidth"), width);
     glUniform1i(glGetUniformLocation(drawProgram, "screenHeight"), height);
+    glUniform1f(glGetUniformLocation(drawProgram, "tileWidth"), tileWidth);
+    glUniform1f(glGetUniformLocation(drawProgram, "tileHeight"), tileHeight);
 
     //render the splats
     glDispatchCompute(width / 16, height / 16, 1);
@@ -888,7 +892,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     double timer = glfwGetTime();
     float tileWidth = width / 16.f;
     float tileHeight = height / 16.f;
-//#define GPUPREPROCESS
+#define GPUPREPROCESS
 #ifndef GPUPREPROCESS
     numDuplicates = 0;
     // for each splat, project the mean
@@ -1034,7 +1038,15 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     computeBins();
     std::cout << "Time taken to preprocess and bin: " << glfwGetTime() - timer << std::endl;
     sort();
+    glFinish();
+    timer = glfwGetTime();
     std::cout << "Time taken to preprocess, bin and sort: " << glfwGetTime() - timer << std::endl;
+    draw(width, height, tileWidth, tileHeight);
+    glFinish();
+    std::cout << "Time taken to preprocess, bin, sort and draw: " << glfwGetTime() - timer << std::endl;
+
+//#define CPUDRAW
+#ifdef CPUDRAW
     // get the buffers from the GPU into the vectors
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedMeansBuffer);
     float *projectedMeansptr = (float *) glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
@@ -1130,7 +1142,13 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
 //    std::sort(indices.begin(), indices.begin() + numSplats + numDuplicates, [&depthVector](int i1, int i2)
 //    { return depthVector[i1] < depthVector[i2]; });
 //    std::cout << "Time taken to sort: " << glfwGetTime() - timer << std::endl;
-
+    //print the maximum bin size
+    int maxBin = 0;
+    for (int i = 1; i < 256; i++)
+    {
+        maxBin = fmax(maxBin, bins[i] - bins[i - 1]);
+    }
+    std::cout << "Max bin size: " << maxBin << std::endl;
     //tiled per pixel rasterisation
     timer = glfwGetTime();
     for(int y=0; y<height; y++)
@@ -1145,6 +1163,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
             int tileIndex = tileY * 16 + tileX;
             int start = (tileIndex == 0) ? 0 : bins[tileIndex - 1];
             int end = bins[tileIndex];
+            end = fmin(end, start + 1000);
             for(int i=start; i<end; i++)
             {
                 int index = splatKeys[indices[i]];
@@ -1163,8 +1182,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
 
                     glm::vec4 conic = projectedCovariances[index];
                     //get the position of the mean in screen space
-                    glm::vec2 meanPosition = glm::vec2(projectedMean[0], projectedMean[1]);
-                    glm::vec2 distance = glm::vec2(x, y) - meanPosition;
+                    glm::vec2 distance = pixelPosition - projectedMean;
                     //get the value of the conic at the distance
                     float power = -0.5f * (conic.x * distance.x * distance.x + conic.z * distance.y * distance.y) -
                                   conic.y * distance.x * distance.y;
@@ -1185,8 +1203,8 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
                     //alpha = 1;
                     //add the value to the pixel
                     //only add if number of splats per pixel is less than 10
-
-                    pixel = alphaBlend(pixel, glm::vec4(colours[index], alpha));
+                    glm::vec3 colour3 = glm::vec3 (colours[index]);
+                    pixel = alphaBlend(pixel, glm::vec4(colour3, alpha));
                     //if the alpha is high enough, we are done with this pixel
                     if (pixel.a > 0.99f)
                     {
@@ -1306,6 +1324,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     std::cout << "Time taken to render: " << glfwGetTime() - timer << std::endl;
     //store the image in a png
     saveImage(image, "cpuRender.png");
+#endif
     std::cout << "Finished rendering on the cpu" << std::endl;
     //print the mean, median and max number of splats per pixel
 //    int total = 0;

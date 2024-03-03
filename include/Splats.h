@@ -55,7 +55,7 @@ class Splats
         void computeBins();
 
         //function to draw the splats
-        void draw(int width, int height);
+        void draw(int width, int height, float tileWidth, float tileHeight);
 
         //function to display the splats
         void display();
@@ -64,7 +64,7 @@ class Splats
         int numDuplicates;
         int numSplatsPostCull;
         std::vector<glm::vec4> means3D;
-        std::vector<glm::vec3> colours;
+        std::vector<glm::vec4> colours;
         std::vector<float> sphericalHarmonics;
         std::vector<float> opacities;
         std::vector<glm::vec3> scales;
