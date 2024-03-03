@@ -1,4 +1,4 @@
-#version 430 core
+#version 460 core
 layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 //bins buffer
@@ -45,6 +45,13 @@ uniform layout(location = 3) int screenHeight;
 uniform layout(location = 4) float tileWidth;
 //tile height uniform
 uniform layout(location = 5) float tileHeight;
+//shared memory to load stuff into
+shared vec4 sharedColour[256];
+shared vec2 sharedProjectedMeans[256];
+shared vec4 sharedConicOpacities[256];
+shared uint pixelFinished;
+shared uint sharedStart;
+shared uint sharedEnd;
 
 //output image2D
 layout(rgba8, binding = 0) writeonly uniform image2D outputImage;
@@ -58,6 +65,7 @@ vec4 alphaBlend(vec4 colour1, vec4 colour2)
     return vec4(blendedColour, alpha1 + alphaToBlend);
 }
 
+
 void main() {
     //get the pixel position
     int x = int(gl_GlobalInvocationID.x);
@@ -69,6 +77,8 @@ void main() {
     int tileX = int(pixelPosition.x / tileWidth);
     int tileY = int(pixelPosition.y / tileHeight);
     int tileIndex = tileY * 16 + tileX;
+    int workgroupIndex = int(gl_LocalInvocationID.x) + int(gl_LocalInvocationID.y) * 16;
+    //get the start and end of the tile
     int start;
     if (tileIndex == 0) {
         start = 0;
@@ -76,35 +86,47 @@ void main() {
         start = bins.data[tileIndex - 1];
     }
     int end = bins.data[tileIndex];
-    //end = min(start + 50000, end);
+    int indexToFetch = start + workgroupIndex;
 
     //loop through the splats in the tile
-    for (int i=start; i<end; i++)
+    for (int i=start; i<end; i += 256, indexToFetch += 256)
     {
-        int index = splatKeys.data[indices.data[i]];
-        vec2 projectedMean = projectedMeans.data[index];
-        float radius = boundingRadii.data[index];
-        vec4 conic = conicOpacities.data[index];
-        vec2 distance = pixelPosition - projectedMean;
-        //get the value of the conic
-        float power = -0.5 * (conic.x * distance.x * distance.x + conic.z * distance.y * distance.y) -
-        conic.y * distance.x * distance.y;
+        //load data for indexToFetch
+        int index = splatKeys.data[indices.data[indexToFetch]];
+        sharedProjectedMeans[workgroupIndex] = projectedMeans.data[index];
+        sharedColour[workgroupIndex] = colour.data[index];
+        sharedConicOpacities[workgroupIndex] = conicOpacities.data[index];
+        //sync threads
+        barrier();
+        //loop through the splats in the tile
+        for(int j=0; j<256; j++)
+        {
+            vec2 projectedMean = sharedProjectedMeans[j];
+            //float radius = boundingRadii.data[index];
+            vec4 conic = sharedConicOpacities[j];
+            vec2 distance = pixelPosition - projectedMean;
+            //get the value of the conic
+            float power = -0.5 * (conic.x * distance.x * distance.x + conic.z * distance.y * distance.y) -
+            conic.y * distance.x * distance.y;
 
-        if (power > 0.0)
-        {
-            continue;
-        }
-        float alpha = min(0.99, exp(power) * conic.w);
-        if (alpha < 1.0 / 255.0)
-        {
-            continue;
-        }
+            if (power > 0.0)
+            {
+                continue;
+            }
+            float alpha = min(0.99, exp(power) * conic.w);
+            if (alpha < 1.0 / 255.0)
+            {
+                continue;
+            }
 
-        col = alphaBlend(col, vec4(colour.data[index].xyz, alpha));
-        if (col.a >= 0.99)
-        {
-            break;
+            col = alphaBlend(col, vec4(sharedColour[j].xyz, alpha));
+            if (col.a >= 0.99)
+            {
+                break;
+            }
         }
+        //sync threads
+        barrier();
 
     }
     //convert col from 0-255 to 0-1

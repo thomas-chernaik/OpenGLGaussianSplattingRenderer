@@ -52,14 +52,14 @@ private:
     float aspect;
     float near;
     float far;
-    int width = 1080;
+    int width = 1024;
 public:
     int getWidth() const;
 
     int getHeight() const;
 
 private:
-    int height = 720;
+    int height = 768;
 
 
 

@@ -1039,11 +1039,11 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     std::cout << "Time taken to preprocess and bin: " << glfwGetTime() - timer << std::endl;
     sort();
     glFinish();
-    timer = glfwGetTime();
     std::cout << "Time taken to preprocess, bin and sort: " << glfwGetTime() - timer << std::endl;
+    timer = glfwGetTime();
     draw(width, height, tileWidth, tileHeight);
     glFinish();
-    std::cout << "Time taken to preprocess, bin, sort and draw: " << glfwGetTime() - timer << std::endl;
+    std::cout << "Time taken to draw: " << glfwGetTime() - timer << std::endl;
 
 //#define CPUDRAW
 #ifdef CPUDRAW
