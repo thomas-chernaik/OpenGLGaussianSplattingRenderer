@@ -30,12 +30,12 @@ class Splats
 {
     public:
         //constructor with file path
-        Splats(const std::string& filePath);
+        Splats(const std::string &filePath, int width, int height);
         //destructor
         ~Splats();
 
         //function to load the vectors to the GPU
-        void loadToGPU();
+        void loadToGPU(int width, int height);
 
         //function to load the shaders
         void loadShaders();

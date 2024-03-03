@@ -12,13 +12,14 @@
 
 #include "stb_image_write.h"
 
-Splats::Splats(const std::string &filePath)
+Splats::Splats(const std::string &filePath, int width, int height)
 {
+
     loadShaders();
     std::cout << "setting up splats" << std::endl;
     loadSplats(filePath);
     computeCovarianceMatrices();
-    loadToGPU();
+    loadToGPU(width, height);
 
     glFinish();
     std::cout << "finished setting up splats" << std::endl;
@@ -61,7 +62,7 @@ Splats::~Splats()
 
 }
 
-void Splats::loadToGPU()
+void Splats::loadToGPU(int width, int height)
 {
     std::cout << "Loading splats to GPU" << std::endl;
     //create the buffers
@@ -135,7 +136,7 @@ void Splats::loadToGPU()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); //GL_NEAREST for no interpolation
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     //set the texture to be the same size as the screen
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1920, 1080, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
     //unbind the texture
     glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -1038,10 +1039,10 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     computeBins();
     std::cout << "Time taken to preprocess and bin: " << glfwGetTime() - timer << std::endl;
     sort();
-    glFinish();
+    //glFinish();
     std::cout << "Time taken to preprocess, bin and sort: " << glfwGetTime() - timer << std::endl;
     timer = glfwGetTime();
-    draw(width, height, tileWidth, tileHeight);
+    draw(width, height, width / 16.f, height / 16.f);
     glFinish();
     std::cout << "Time taken to draw: " << glfwGetTime() - timer << std::endl;
 

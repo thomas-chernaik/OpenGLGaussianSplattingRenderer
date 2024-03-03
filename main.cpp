@@ -44,7 +44,7 @@ int main()
     camera.rotateRight(40.0f);
     camera.update();
 
-    Splats splats("models/point_cloud.ply");
+    Splats splats("models/point_cloud.ply", camera.getWidth(), camera.getHeight());
     //splats.simplifiedDraw(camera.getProjectionMatrix() * camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
     //splats.printProjectedMeans();
     splats.cpuRender(camera.getViewMatrix(), camera.getWidth(), camera.getHeight(), camera.getFocalX(),
