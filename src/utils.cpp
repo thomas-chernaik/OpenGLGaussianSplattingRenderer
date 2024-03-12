@@ -48,7 +48,7 @@ std::vector<double> createRandomNumbersDouble(int size, int maxNumber) {
 //return a vector floats
 std::vector<float> createRandomNumbersFloat(int size) {
     //set the seed for the random number generator
-    srand(10);
+    srand(20);
     if(size < 1) {
         std::cerr << "Error: size must be greater than 0" << std::endl;
         return std::vector<float>();
@@ -57,7 +57,7 @@ std::vector<float> createRandomNumbersFloat(int size) {
     for (int i = 0; i < size; i++) {
         //add a random number between 0 and 1, and a random number between 0 and 255
         int random = rand() % 255;
-        randomNumbers[i] = (float)rand() / RAND_MAX + random;
+        randomNumbers[i] = (float)rand() / RAND_MAX + random + 0.5f;
     }
     return randomNumbers;
 }

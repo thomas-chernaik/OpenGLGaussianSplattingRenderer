@@ -59,7 +59,7 @@ public:
     int getHeight() const;
 
 private:
-    int height = 768;
+    int height = 512;
 
 
 

@@ -1,5 +1,5 @@
 #version 460 core
-layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout (local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 
 //bins buffer
 layout(std430, binding = 0) buffer Bins {
@@ -35,6 +35,10 @@ layout(std430, binding = 5) buffer SplatKeys {
 layout(std430, binding = 6) buffer BoundingRadii {
     float data[];
 } boundingRadii;
+//depth buffer
+layout(std430, binding = 7) buffer DepthBuffer {
+    float data[];
+} depthBuffer;
 //num splats uniform
 uniform layout(location = 0) int numSplats;
 //screen width uniform
@@ -46,9 +50,10 @@ uniform layout(location = 4) float tileWidth;
 //tile height uniform
 uniform layout(location = 5) float tileHeight;
 //shared memory to load stuff into
-shared vec4 sharedColour[256];
-shared vec2 sharedProjectedMeans[256];
-shared vec4 sharedConicOpacities[256];
+shared vec4 sharedColour[1024];
+shared vec2 sharedProjectedMeans[1024];
+shared vec4 sharedConicOpacities[1024];
+shared float sharedDepth[1024];
 shared uint pixelFinished;
 shared uint sharedStart;
 shared uint sharedEnd;
@@ -77,7 +82,7 @@ void main() {
     int tileX = int(pixelPosition.x / tileWidth);
     int tileY = int(pixelPosition.y / tileHeight);
     int tileIndex = tileY * 16 + tileX;
-    int workgroupIndex = int(gl_LocalInvocationID.x) + int(gl_LocalInvocationID.y) * 16;
+    int workgroupIndex = int(gl_LocalInvocationID.x) + int(gl_LocalInvocationID.y) * 32;
     //get the start and end of the tile
     int start;
     if (tileIndex == 0) {
@@ -86,43 +91,51 @@ void main() {
         start = bins.data[tileIndex - 1];
     }
     int end = bins.data[tileIndex];
+    //end = min(end, numSplats);
     int indexToFetch = start + workgroupIndex;
-
+    bool done = false;
     //loop through the splats in the tile
-    for (int i=start; i<end; i += 256, indexToFetch += 256)
+    for (int i=start; i<end; i += 1024, indexToFetch += 1024)
     {
         //load data for indexToFetch
-        int index = splatKeys.data[indices.data[indexToFetch]];
+        int indexToKey = indices.data[indexToFetch];
+        int index = splatKeys.data[indexToKey];
+
         sharedProjectedMeans[workgroupIndex] = projectedMeans.data[index];
         sharedColour[workgroupIndex] = colour.data[index];
         sharedConicOpacities[workgroupIndex] = conicOpacities.data[index];
+
         //sync threads
         barrier();
         //loop through the splats in the tile
-        for(int j=0; j<256; j++)
+        if (!done)
         {
-            vec2 projectedMean = sharedProjectedMeans[j];
-            //float radius = boundingRadii.data[index];
-            vec4 conic = sharedConicOpacities[j];
-            vec2 distance = pixelPosition - projectedMean;
-            //get the value of the conic
-            float power = -0.5 * (conic.x * distance.x * distance.x + conic.z * distance.y * distance.y) -
-            conic.y * distance.x * distance.y;
+            for (int j=0; j<1024; j++)
+            {
+                vec2 projectedMean = sharedProjectedMeans[j];
+                //float radius = boundingRadii.data[index];
+                vec4 conic = sharedConicOpacities[j];
+                vec2 distance = pixelPosition - projectedMean;
+                //get the value of the conic
+                float power = -0.5 * (conic.x * distance.x * distance.x + conic.z * distance.y * distance.y) -
+                conic.y * distance.x * distance.y;
 
-            if (power > 0.0)
-            {
-                continue;
-            }
-            float alpha = min(0.99, exp(power) * conic.w);
-            if (alpha < 1.0 / 255.0)
-            {
-                continue;
-            }
+                if (power > 0.0)
+                {
+                    continue;
+                }
+                float alpha = min(0.99, exp(power) * conic.w);
+                if (alpha < 1.0 / 255.0)
+                {
+                    continue;
+                }
 
-            col = alphaBlend(col, vec4(sharedColour[j].xyz, alpha));
-            if (col.a >= 0.99)
-            {
-                break;
+                col = alphaBlend(col, vec4(sharedColour[j].xyz, alpha));
+                if (col.a >= 0.99)
+                {
+                    done = true;
+                    break;
+                }
             }
         }
         //sync threads

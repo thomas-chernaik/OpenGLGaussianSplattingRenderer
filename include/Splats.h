@@ -125,6 +125,7 @@ class Splats
         GLuint drawProgram;
         GLuint binProgram;
         GLuint binPrefixSumProgram;
+        GLuint paddingProgram;
 
         //simplified draw program
         GLuint simplifiedDrawProgram;
@@ -145,6 +146,8 @@ public:
     void printProjectedMeansByIndex();
 
     void cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, float focal_y, float tan_fov_x,
+                   float tan_fov_y, glm::mat4 vpMatrix);
+    void gpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, float focal_y, float tan_fov_x,
                    float tan_fov_y, glm::mat4 vpMatrix);
     void cpuProjectSplats(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height);
     void simplifiedDraw(glm::mat4 vpMatrix, glm::mat3 rotationMatrix, int width, int height);

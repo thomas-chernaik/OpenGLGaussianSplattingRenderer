@@ -14,7 +14,8 @@
 #define DISS_SORT_CPP
 
 //function to create and link the shaders we will use later
-void createAndLinkSortAndHistogramShaders(GLuint &histogramProgram, GLuint &sortProgram, GLuint &sumProgram)
+void createAndLinkSortAndHistogramShaders(GLuint &histogramProgram, GLuint &sortProgram, GLuint &sumProgram,
+                                          GLuint paddingProgram)
 {
     std::cout << "compiling sorting shaders" << std::endl;
     //read shader file for histogram
@@ -120,6 +121,42 @@ void createAndLinkSortAndHistogramShaders(GLuint &histogramProgram, GLuint &sort
         return;
     }
 
+    //read shader file for padding
+    std::string paddingShaderCode = readShaderFile("shaders/pad.glsl");
+
+    //create padding shader
+    GLuint paddingShader = glCreateShader(GL_COMPUTE_SHADER);
+
+    const char *paddingShaderCodePtr = paddingShaderCode.c_str();
+    glShaderSource(paddingShader, 1, &paddingShaderCodePtr, nullptr);
+    glCompileShader(paddingShader);
+
+    //check padding shader compiled
+    glGetShaderiv(paddingShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        // Compilation failed, print error log
+        char infoLog[512];
+        glGetShaderInfoLog(paddingShader, 512, nullptr, infoLog);
+        std::cout << "Shader compilation failed:\n" << infoLog << std::endl;
+        glfwTerminate();
+        return;
+    }
+
+    //create padding program and attach shader
+    paddingProgram = glCreateProgram();
+    glAttachShader(paddingProgram, paddingShader);
+    glLinkProgram(paddingProgram);
+
+    //check padding program linked
+    glGetProgramiv(paddingProgram, GL_LINK_STATUS, &success);
+    if (!success)
+    {
+        std::cerr << "Failed to link padding program" << std::endl;
+        glfwTerminate();
+        return;
+    }
+
+
     std::cout << "compiled and linked sorting shaders" << std::endl;
 }
 
@@ -165,9 +202,21 @@ void createAndLinkSortShader(GLuint &program)
     std::cout << "compiled and linked sorting shader" << std::endl;
 }
 
-void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sortProgram, GLuint buffer,
-                   GLuint intermediateBuffer, GLuint orderBuffer, GLuint histogramBuffer, int size, int workGroupCount,
-                   int workGroupSize)
+int PadBuffer(int size, int unitWidth)
+{
+    //calculate the amount of padding needed
+    if(size % unitWidth == 0)
+    {
+        return 0;
+    }
+    int padding = unitWidth - (size % unitWidth);
+
+    return padding;
+}
+
+void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sortProgram, GLuint intermediateBuffer,
+                   GLuint orderBuffer, GLuint histogramBuffer, int size, int workGroupCount, int workGroupSize,
+                   GLuint buffer)
 {
     std::cout << "Sorting " << size << " numbers" << std::endl;
     //create query object
@@ -175,11 +224,21 @@ void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sort
     glGenQueries(1, &startTimeQuery);
     glGenQueries(1, &endTimeQuery);
     GLint64 startTime, endTime;
-    int numberOfSections = workGroupCount * workGroupSize;
-    int sectionSize = size / numberOfSections;
 
     //start the timer
     glQueryCounter(startTimeQuery, GL_TIMESTAMP);
+    int numberOfSections = workGroupCount * workGroupSize;
+    int paddingSize = numberOfSections;
+
+    int paddedSize = size + PadBuffer(size, paddingSize);
+
+    int sectionSize = paddedSize / numberOfSections;
+    if(paddedSize % paddingSize != 0)
+    {
+        std::cerr << "Size must be a multiple of " << paddingSize << std::endl;
+        return;
+    }
+
 
     //run the sort
     for(int i=0; i<8; i++)
@@ -192,6 +251,7 @@ void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sort
         glUniform1i(glGetUniformLocation(histogramProgram, "sectionSize"), sectionSize);
         glUniform1i(glGetUniformLocation(histogramProgram, "numSections"), numberOfSections);
         glUniform1i(glGetUniformLocation(histogramProgram, "segmentReadOnly"), i);
+        glUniform1i(glGetUniformLocation(histogramProgram, "bufferSize"), size);
         glDispatchCompute(workGroupCount, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
@@ -212,6 +272,7 @@ void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sort
         glUniform1i(glGetUniformLocation(sortProgram, "sectionSize"), sectionSize);
         glUniform1i(glGetUniformLocation(sortProgram, "numSections"), numberOfSections);
         glUniform1i(glGetUniformLocation(sortProgram, "segmentReadOnly"), i);
+        glUniform1i(glGetUniformLocation(histogramProgram, "bufferSize"), size);
         glDispatchCompute(workGroupCount, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 

@@ -160,8 +160,8 @@ TEST(SortTest, SortTest) {
 
     std::cout << "compiling shaders" << std::endl;
     //createAndLinkSortShader();
-    GLuint histogramProgram, sortProgram, sumProgram;
-    createAndLinkSortAndHistogramShaders(histogramProgram, sortProgram, sumProgram);
+    GLuint histogramProgram, sortProgram, sumProgram, paddingProgram;
+    createAndLinkSortAndHistogramShaders(histogramProgram, sortProgram, sumProgram, paddingProgram);
     std::cout << "compiled shaders" << std::endl;
 
     //create buffer
@@ -178,7 +178,7 @@ TEST(SortTest, SortTest) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, orderBuffer);
     //create random numbers
 
-    std::vector<float> randomNumbers = createRandomNumbersFloat(1024*1024);
+    std::vector<float> randomNumbers = createRandomNumbersFloat(32*16*10000-7);
     //print the max number
     //std::cout << "max number: " << *std::max_element(randomNumbers.begin(), randomNumbers.end()) << std::endl;
     //fill the input buffer with random numbers
@@ -210,11 +210,11 @@ TEST(SortTest, SortTest) {
     //int* outputBufferData = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
     //run program
     //GPURadixSort(buffer, intermediateBuffer, randomNumbers.size());
+    int size = randomNumbers.size();
 
-
-    GPURadixSort2(histogramProgram, sumProgram, sortProgram, buffer, intermediateBuffer, orderBuffer, histogramBuffer,
-                  randomNumbers.size(), 8, 256);
-    //deep copy random numbers
+    GPURadixSort2(histogramProgram, sumProgram, sortProgram, intermediateBuffer, orderBuffer, histogramBuffer,
+                  size, 16, 32, buffer);
+//    //deep copy random numbers
     std::vector<float> randomNumbersCopy(randomNumbers);
 
     //sort random numbers on cpu
@@ -227,21 +227,21 @@ TEST(SortTest, SortTest) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, orderBuffer);
     int* outputBufferData = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
     //copy buffer data to vector
-    std::vector<int> outputBufferVector(outputBufferData, outputBufferData + randomNumbers.size());
+    std::vector<int> outputBufferVector(outputBufferData, outputBufferData + size);
     //find the number 44
-    std::cout << "number 44 is at index " << std::find(outputBufferVector.begin(), outputBufferVector.end(), 44) - outputBufferVector.begin() << std::endl;
+    //std::cout << "number 44 is at index " << std::find(outputBufferVector.begin(), outputBufferVector.end(), 44) - outputBufferVector.begin() << std::endl;
     //check buffer is sorted
     try{
         int errors = 0;
         //get buffer data
-        for (int i = 1; i < randomNumbers.size(); i++) {
+        for (int i = 1; i < size; i++) {
             ASSERT_GE(randomNumbersCopy[outputBufferVector[i]], randomNumbersCopy[outputBufferVector[i - 1]]);
             if(randomNumbersCopy[outputBufferVector[i]] < randomNumbersCopy[outputBufferVector[i - 1]]) {
                 //std::cout << i << std::endl;
                 errors++;
-                std::cout << i << std::endl;
+                //std::cout << i << std::endl;
             }
-            ASSERT_EQ(randomNumbersCopy[outputBufferVector[i]], randomNumbers[i]);
+           ASSERT_EQ(randomNumbersCopy[outputBufferVector[i]], randomNumbers[i]);
 
         }
         std::cout << "number of errors: " << errors << std::endl;

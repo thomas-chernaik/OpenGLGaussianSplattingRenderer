@@ -82,7 +82,7 @@ void main()
     //if the pixel is off screen, give it a big depth (100000)
     if (projectedMean.x < -1.0 || projectedMean.x > 1.0 || projectedMean.y < -1.0 || projectedMean.y > 1.0)
     {
-        depthBuffer.data[i] = 100000.0;
+        depthBuffer.data[i] = 1000000.0;
         indices.data[i] = int(i);
         //set everything else to 0
         means2D.data[i] = vec2(0.0, 0.0);
@@ -167,7 +167,11 @@ void main()
 
     //calculate the number of duplicates
     uint numDuplicates = (tileMaxX - tileMinX + 1) * (tileMaxY - tileMinY + 1) - 1;
-    int duplicateOffset = int(atomicCounterAdd(duplicates, numDuplicates)) + 1;
+    if(numDuplicates == 0)
+    {
+        return;
+    }
+    int duplicateOffset = int(atomicCounterAdd(duplicates, numDuplicates)) + int(numSplats);
 
     //for each tile the splat is in, duplicate the splat
     for(uint y = tileMinY; y <= tileMaxY; y++)
@@ -179,10 +183,10 @@ void main()
                 continue;
             }
             tileIndex = y * 16 + x;
-            int dupedIndex = int(numSplats + duplicateOffset++);
-            depthBuffer.data[dupedIndex] = tileIndex + projectedMean.z;
-            splatKeys.data[dupedIndex] = int(i);
-            indices.data[dupedIndex] = dupedIndex;
+            depthBuffer.data[duplicateOffset] = tileIndex + projectedMean.z;
+            splatKeys.data[duplicateOffset] = int(i);
+            indices.data[duplicateOffset] = duplicateOffset;
+            duplicateOffset++;
         }
     }
 
