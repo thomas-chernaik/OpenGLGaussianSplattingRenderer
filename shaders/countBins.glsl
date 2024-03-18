@@ -3,10 +3,10 @@
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 //the array of indexes to count in
-layout(std430, binding = 0) buffer keyBuffer
+layout(std430, binding = 0) buffer DepthBuffer
 {
-    uvec2 data[];
-} keysBuffer;
+    float data[];
+} depthBuffer;
 
 //the length of the array
 layout(location = 0) uniform int length;
@@ -22,12 +22,11 @@ void main() {
     int index = int(gl_GlobalInvocationID.x);
 
     //if the index is out of bounds, return
-    if(index >= length) return;
+    if(index > length) return;
 
     //get the value at the index
-    uint value = keysBuffer.data[index].x;
-    //if(value > 255) return;//we can assume this won't happen, but we can uncomment if we want to be safe
-
+    int value = int(depthBuffer.data[index]);
+    if(value < 0 || value >= 256) return;
     //increment the bin at the value
     atomicAdd(binsBuffer.data[value], 1);
 }

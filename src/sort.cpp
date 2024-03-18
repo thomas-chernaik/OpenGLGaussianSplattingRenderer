@@ -1,8 +1,6 @@
 //
 // Created by thomas on 29/11/23.
 //
-#include <cmath>
-#include <vector>
 #include <iostream>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -120,69 +118,44 @@ void createAndLinkSortAndHistogramShaders(GLuint &histogramProgram, GLuint &sort
         return;
     }
 
+
+
     std::cout << "compiled and linked sorting shaders" << std::endl;
 }
 
 
-//function to create and link the shader we will use later
-void createAndLinkSortShader(GLuint &program)
+int PadBuffer(int size, int unitWidth)
 {
-    std::cout << "compiling sorting shader" << std::endl;
-    //read shader file
-    std::string shaderCode = readShaderFile("sort.glsl");
-
-    //create shader
-    GLuint shader = glCreateShader(GL_COMPUTE_SHADER);
-    const char *shaderCodePtr = shaderCode.c_str();
-    glShaderSource(shader, 1, &shaderCodePtr, nullptr);
-    glCompileShader(shader);
-
-    //check shader compiled
-    GLint success;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        // Compilation failed, print error log
-        char infoLog[512];
-        glGetShaderInfoLog(shader, 512, nullptr, infoLog);
-        std::cout << "Shader compilation failed:\n" << infoLog << std::endl;
-        glfwTerminate();
-        return;
-    }
-
-    //create program and attach shader
-    program = glCreateProgram();
-    glAttachShader(program, shader);
-    glLinkProgram(program);
-
-    //check program linked
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if (!success)
+    //calculate the amount of padding needed
+    if(size % unitWidth == 0)
     {
-        std::cerr << "Failed to link program" << std::endl;
-        glfwTerminate();
-        return;
+        return 0;
     }
-    std::cout << "compiled and linked sorting shader" << std::endl;
+    int padding = unitWidth - (size % unitWidth);
+
+    return padding;
 }
 
-void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sortProgram, GLuint buffer,
-                   GLuint intermediateBuffer, GLuint orderBuffer, GLuint histogramBuffer, int size, int workGroupCount,
-                   int workGroupSize)
+void GPURadixSort(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sortProgram, GLuint intermediateBuffer,
+                  GLuint orderBuffer, GLuint histogramBuffer, int size, int workGroupCount, int workGroupSize,
+                  GLuint buffer)
 {
-    std::cout << "Sorting " << size << " numbers" << std::endl;
-    //create query object
-    GLuint startTimeQuery, endTimeQuery;
-    glGenQueries(1, &startTimeQuery);
-    glGenQueries(1, &endTimeQuery);
-    GLint64 startTime, endTime;
-    int numberOfSections = workGroupCount * workGroupSize;
-    int sectionSize = size / numberOfSections;
 
-    //start the timer
-    glQueryCounter(startTimeQuery, GL_TIMESTAMP);
+    int numberOfSections = workGroupCount * workGroupSize;
+    int paddingSize = numberOfSections;
+
+    int paddedSize = size + PadBuffer(size, paddingSize);
+
+    int sectionSize = paddedSize / numberOfSections;
+    if (paddedSize % paddingSize != 0)
+    {
+        std::cerr << "Size must be a multiple of " << paddingSize << std::endl;
+        return;
+    }
+
 
     //run the sort
-    for(int i=0; i<8; i++)
+    for (int i = 0; i < 8; i++)
     {
         //generate the histograms
         glUseProgram(histogramProgram);
@@ -192,6 +165,7 @@ void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sort
         glUniform1i(glGetUniformLocation(histogramProgram, "sectionSize"), sectionSize);
         glUniform1i(glGetUniformLocation(histogramProgram, "numSections"), numberOfSections);
         glUniform1i(glGetUniformLocation(histogramProgram, "segmentReadOnly"), i);
+        glUniform1i(glGetUniformLocation(histogramProgram, "bufferSize"), size);
         glDispatchCompute(workGroupCount, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
@@ -212,6 +186,7 @@ void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sort
         glUniform1i(glGetUniformLocation(sortProgram, "sectionSize"), sectionSize);
         glUniform1i(glGetUniformLocation(sortProgram, "numSections"), numberOfSections);
         glUniform1i(glGetUniformLocation(sortProgram, "segmentReadOnly"), i);
+        glUniform1i(glGetUniformLocation(histogramProgram, "bufferSize"), size);
         glDispatchCompute(workGroupCount, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
@@ -220,74 +195,11 @@ void GPURadixSort2(GLuint histogramProgram, GLuint prefixSumProgram, GLuint sort
         orderBuffer = intermediateBuffer;
         intermediateBuffer = temp;
     }
-    //intermediateBuffer;
-    //stop the timer
-    glQueryCounter(endTimeQuery, GL_TIMESTAMP);
-
-    //get time taken
-    glGetQueryObjecti64v(startTimeQuery, GL_QUERY_RESULT, &startTime);
-    glGetQueryObjecti64v(endTimeQuery, GL_QUERY_RESULT, &endTime);
-
-    double timeTaken = (endTime - startTime) / 1000000000.f;
-    std::cout << "GPU sort took " << timeTaken << " seconds" << std::endl;
-}
-
-void GPURadixSort(GLuint program, GLuint buffer, GLuint outputBuffer, int size)
-{
-    //create query object
-    GLuint startTimeQuery, endTimeQuery;
-    glGenQueries(1, &startTimeQuery);
-    glGenQueries(1, &endTimeQuery);
-    GLint64 startTime, endTime;
-
-    //measure GPU time
-
-
-
-
-    //get number of work groups
-    int workGroupCount = 4;
-    //work out the section size and number of sections
-    int workGroupSize = 256;
-    int numberOfSections = workGroupCount * workGroupSize;
-    int sectionSize = size / numberOfSections;
-    //use the shader program
-    glUseProgram(program);
-
-    //bind input and output buffers
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, outputBuffer);
-
-    //create and bind the shared histogram buffer, of length 16 * number of sections
-    int histogramSize = 16 * numberOfSections;
-    GLuint histogramBuffer;
-    glGenBuffers(1, &histogramBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, histogramBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, histogramSize     * sizeof(int), nullptr, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, histogramBuffer);
-
-    //set the uniform variables
-    glUniform1i(glGetUniformLocation(program, "sectionSize"), sectionSize);
-    glUniform1i(glGetUniformLocation(program, "numSections"), numberOfSections);
-
-
-    glQueryCounter(startTimeQuery, GL_TIMESTAMP);
-    glDispatchCompute(workGroupCount, 1, 1);
-    //wait for shader to finish
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-
-    glQueryCounter(endTimeQuery, GL_TIMESTAMP);
-
-    //get time taken
-    glGetQueryObjecti64v(startTimeQuery, GL_QUERY_RESULT, &startTime);
-    glGetQueryObjecti64v(endTimeQuery, GL_QUERY_RESULT, &endTime);
-
-    double timeTaken = (endTime - startTime) / 1000000000.f;
-
-
-    //print time taken. Do not round down to 0
-    std::cout << "GPU sort took " << timeTaken << " seconds" << std::endl;
+    //swap the output and order buffers
+    GLuint temp = orderBuffer;
+    orderBuffer = intermediateBuffer;
+    intermediateBuffer = temp;
 
 }
 
-#endif //DISS_SORT_H
+#endif //DISS_SORT_CPP

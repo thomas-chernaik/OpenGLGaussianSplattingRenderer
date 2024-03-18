@@ -1,4 +1,4 @@
-#version 430 core
+#version 460 core
 layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
 
@@ -36,6 +36,9 @@ layout (location = 7) uniform mat4 VPMatrix;
 //num splats
 layout (location = 8) uniform uint numSplats;
 
+//atomic counter for the number of duplicates
+layout (binding = 9, offset = 0) uniform atomic_uint duplicates;
+
 // Output data
 layout (std430, binding = 3) buffer Means2D {
     vec2 data[];
@@ -49,9 +52,14 @@ layout (std430, binding = 5) buffer Conics {
     vec4 data[];
 } conics;
 
-layout (std430, binding = 6) buffer BoundingRadii {
-    float data[];
-} boundingRadii;
+
+layout (std430, binding = 6) buffer Indices {
+    int data[];
+} indices;
+
+layout (std430, binding = 7) buffer SplatKeys {
+    int data[];
+} splatKeys;
 
 void main()
 {
@@ -61,20 +69,24 @@ void main()
     {
         return;
     }
+    //set the index
+    indices.data[i] = int(i);
     vec4 mean = means3D.data[i];
 
     // Project the mean to 2D
     vec4 projectedMean = VPMatrix * mean;
     projectedMean /= max(projectedMean.w, 0.0001);
-    //store the depth
     //if the pixel is off screen, give it a big depth (100000)
     if (projectedMean.x < -1.0 || projectedMean.x > 1.0 || projectedMean.y < -1.0 || projectedMean.y > 1.0)
     {
-        depthBuffer.data[i] = 100000.0;
-        //means2D.data[i] = vec2(projectedMean.x, screenWidth);
+        depthBuffer.data[i] = 1000000.0;
+        indices.data[i] = int(i);
+        //set everything else to 0
+        means2D.data[i] = vec2(0.0, 0.0);
+        conics.data[i] = vec4(0.0, 0.0, 0.0, 0.0);
+        splatKeys.data[i] = 0;
         return;
     }
-    depthBuffer.data[i] = projectedMean.z;
     //convert the mean to screen space
     projectedMean = (projectedMean + 1.0) * 0.5;
     projectedMean.x *= screenWidth;
@@ -133,7 +145,53 @@ void main()
     float middle = (covariance2DCompressed.z + covariance2DCompressed.x) * 0.5;
     float lambda1 = middle + sqrt(max(0.1, middle * middle - determinant));
     float lambda2 = middle - sqrt(max(0.1, middle * middle - determinant));
-    boundingRadii.data[i] = ceil(3.0 * sqrt(max(lambda1, lambda2)));
+    float radius = ceil(3.0 * sqrt(max(lambda1, lambda2)));
+    float tileWidth = screenWidth / 16;
+    float tileHeight = screenHeight / 16;
 
+    uint tileMinX = max(0, int((projectedMean.x  - radius) / tileWidth));
+    uint tileMaxX = min(15, int((projectedMean.x + radius) / tileWidth));
+    uint tileMinY = max(0, int((projectedMean.y - radius) / tileHeight));
+    uint tileMaxY = min(15, int((projectedMean.y + radius) / tileHeight));
+    //calculate the main tile for the splat
+    int tileX = int(projectedMean.x / tileWidth);
+    int tileY = int(projectedMean.y / tileHeight);
+    uint tileIndex = tileY * 16 + tileX;
+    depthBuffer.data[i] = tileIndex + projectedMean.z;
+    splatKeys.data[i] = int(i);
+
+    //calculate the number of duplicates
+    uint numDuplicates = (tileMaxX - tileMinX + 1) * (tileMaxY - tileMinY + 1) - 1;
+    if(numDuplicates == 0)
+    {
+        return;
+    }
+    if(atomicCounter(duplicates) >= numSplats)
+    {
+        return;
+    }
+    int duplicateOffset = int(atomicCounterAdd(duplicates, numDuplicates)) + int(numSplats) + 1;
+
+
+    //for each tile the splat is in, duplicate the splat
+    for(uint y = tileMinY; y <= tileMaxY; y++)
+    {
+        for (uint x = tileMinX; x <= tileMaxX; x++)
+        {
+            if (x == tileX && y == tileY)
+            {
+                continue;
+            }
+            tileIndex = y * 16 + x;
+            depthBuffer.data[duplicateOffset] = tileIndex + projectedMean.z;
+            splatKeys.data[duplicateOffset] = int(i);
+            indices.data[duplicateOffset] = duplicateOffset;
+            duplicateOffset++;
+            if(duplicateOffset >= int(numSplats) * 2)
+            {
+                return;
+            }
+        }
+    }
 
 }

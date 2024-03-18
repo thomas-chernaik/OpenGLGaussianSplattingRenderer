@@ -10,7 +10,7 @@ Camera::Camera()
     rotation = glm::vec3(0.0f, 0.0f, 0.0f);
     fovy = 60.0f;
     aspect = (float)width / (float)height;
-    near = 0.1f;
+    near = 0.0001f;
     far = 10000.0f;
     projectionMatrix = glm::perspective(glm::radians(fovy), aspect, near, far);
     update();
@@ -102,26 +102,26 @@ void Camera::getInput(GLFWwindow* window)
     }
     //if left press down this frame, rotate left
     if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
-        rotateLeft(0.1f);
+        rotateLeft(1.f);
     }
     //if right press down this frame, rotate right
     if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
-        rotateRight(0.1f);
+        rotateRight(1.f);
     }
     //if up press down this frame, rotate up
     if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
-        rotateUp(0.1f);
+        rotateUp(1.f);
     }
     //if down press down this frame, rotate down
     if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
-        rotateDown(0.1f);
+        rotateDown(1.f);
     }
 }
 
 void Camera::moveForward(float distance)
 {
     //move forward in the direction of the camera
-    position = position + glm::vec3((-rotationMatrix[2] * distance).x, (-rotationMatrix[2] * distance).y, (-rotationMatrix[2] * distance).z);
+    position = position + glm::vec3((rotationMatrix[0][2] * distance), (rotationMatrix[1][2] * distance), (rotationMatrix[2][2] * distance));
     update();
 }
 
@@ -133,7 +133,7 @@ void Camera::moveBackward(float distance)
 void Camera::moveLeft(float distance)
 {
     //move left in the direction of the camera
-    position = position + glm::vec3((rotationMatrix[0] * distance).x, (rotationMatrix[0] * distance).y, (rotationMatrix[0] * distance).z);
+    position = position + glm::vec3((rotationMatrix[0][0] * distance), (rotationMatrix[1][0] * distance), (rotationMatrix[2][0] * distance));
     update();
 }
 
@@ -144,8 +144,8 @@ void Camera::moveRight(float distance)
 
 void Camera::moveUp(float distance)
 {
-    //move up in the direction of the camera
-    position = position + glm::vec3((rotationMatrix[1] * distance).x, (rotationMatrix[1] * distance).y, (rotationMatrix[1] * distance).z);
+    //move up
+    position = position + glm::vec3(0.0f, distance, 0.0f);
     update();
 }
 
