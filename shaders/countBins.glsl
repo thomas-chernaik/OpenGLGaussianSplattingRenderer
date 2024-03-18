@@ -22,7 +22,7 @@ void main() {
     int index = int(gl_GlobalInvocationID.x);
 
     //if the index is out of bounds, return
-    if(index >= length) return;
+    if(index > length) return;
 
     //get the value at the index
     int value = int(depthBuffer.data[index]);

@@ -171,7 +171,12 @@ void main()
     {
         return;
     }
-    int duplicateOffset = int(atomicCounterAdd(duplicates, numDuplicates)) + int(numSplats);
+    if(atomicCounter(duplicates) >= numSplats)
+    {
+        return;
+    }
+    int duplicateOffset = int(atomicCounterAdd(duplicates, numDuplicates)) + int(numSplats) + 1;
+
 
     //for each tile the splat is in, duplicate the splat
     for(uint y = tileMinY; y <= tileMaxY; y++)
@@ -187,6 +192,10 @@ void main()
             splatKeys.data[duplicateOffset] = int(i);
             indices.data[duplicateOffset] = duplicateOffset;
             duplicateOffset++;
+            if(duplicateOffset >= int(numSplats) * 2)
+            {
+                return;
+            }
         }
     }
 

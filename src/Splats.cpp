@@ -881,6 +881,7 @@ void Splats::preprocessTemp(glm::mat4 viewMatrix, int width, int height, float f
     GLuint *numDuped = (GLuint *) glMapBuffer(GL_ATOMIC_COUNTER_BUFFER, GL_READ_ONLY);
     std::cout << "num duped: " << numDuped[0] << std::endl;
     numDuplicates = numDuped[0];
+    numDuplicates = std::min(numDuplicates, numSplats);
     glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);
 
 }
@@ -890,7 +891,7 @@ void Splats::gpuRender(glm::mat4 viewMatrix, int width, int height, float focal_
 {
     preprocessTemp(viewMatrix, width, height, focal_x, focal_y, tan_fov_x, tan_fov_y, vpMatrix);
 
-    //print the bins
+    //print the binscpuRender
     computeBins();
     sort();
     //print the bins
@@ -900,7 +901,7 @@ void Splats::gpuRender(glm::mat4 viewMatrix, int width, int height, float focal_
 }
 
 void
-Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, float focal_y, float tan_fov_x,
+    Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, float focal_y, float tan_fov_x,
                   float tan_fov_y, glm::mat4 vpMatrix)
 {
     //create the image to render to, as a 2D vector of vec4s
@@ -1040,6 +1041,10 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
         //calculate the number of duplicates
         uint numberDuplicates = (tileMaxX - tileMinX + 1) * (tileMaxY - tileMinY + 1) - 1;
         int duplicateOffset = numSplats + numDuplicates;
+        if(numDuplicates > numSplats * 2)
+        {
+            continue;
+        }
         numDuplicates += numberDuplicates;
         //store the duplicates
         for(uint y = tileMinY; y <= tileMaxY; y++)
@@ -1074,8 +1079,9 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     timer = glfwGetTime();
     preprocessTemp(viewMatrix, width, height, focal_x, focal_y, tan_fov_x, tan_fov_y, vpMatrix);
     std::cout << "Time taken to preprocess: " << glfwGetTime() - timer << std::endl;
+    computeBins();
     std::cout << "Time taken to preprocess and bin: " << glfwGetTime() - timer << std::endl;
-//#define TEST
+#define TEST
 #ifdef TEST
     // get the buffers from the GPU into the vectors
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, projectedMeansBuffer);
@@ -1128,6 +1134,7 @@ Splats::cpuRender(glm::mat4 viewMatrix, int width, int height, float focal_x, fl
     GLuint *binsptr = (GLuint *) glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
     for (int i = 0; i < 256; i++)
     {
+
         std::cout << "bin " << i << " has a difference of " << bins[i] - binsptr[i] << std::endl;
     }
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);

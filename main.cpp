@@ -44,12 +44,12 @@ int main()
     camera.rotateRight(40.0f);
     camera.update();
 
-    Splats splats("models/point_cloud.ply", camera.getWidth(), camera.getHeight());
+    Splats splats("models/bike-small.ply", camera.getWidth(), camera.getHeight());
     //splats.simplifiedDraw(camera.getProjectionMatrix() * camera.getViewMatrix(), camera.getRotationMatrix(), camera.getWidth(), camera.getHeight());
     //splats.printProjectedMeans();
-    splats.cpuRender(camera.getViewMatrix(), camera.getWidth(), camera.getHeight(), camera.getFocalX(),
-                     camera.getFocalY(), camera.getTanFovy(), camera.getTanFovx(),
-                     camera.getProjectionMatrix() * camera.getViewMatrix());
+//    splats.cpuRender(camera.getViewMatrix(), camera.getWidth(), camera.getHeight(), camera.getFocalX(),
+//                     camera.getFocalY(), camera.getTanFovy(), camera.getTanFovx(),
+//                     camera.getProjectionMatrix() * camera.getViewMatrix());
     /*
     //render image
     //preprocess splats
@@ -112,6 +112,14 @@ int main()
         splats.gpuRender(camera.getViewMatrix(), camera.getWidth(), camera.getHeight(), camera.getFocalX(),
                          camera.getFocalY(), camera.getTanFovy(), camera.getTanFovx(),
                          camera.getProjectionMatrix() * camera.getViewMatrix());
+        //if get key c
+        if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
+            //cpu render
+            splats.cpuRender(camera.getViewMatrix(), camera.getWidth(), camera.getHeight(), camera.getFocalX(),
+                             camera.getFocalY(), camera.getTanFovy(), camera.getTanFovx(),
+                             camera.getProjectionMatrix() * camera.getViewMatrix());
+            return 0;
+        }
         splats.display();
         //swap buffers
         glfwSwapBuffers(window);

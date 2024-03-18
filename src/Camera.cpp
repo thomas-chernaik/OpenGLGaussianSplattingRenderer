@@ -10,7 +10,7 @@ Camera::Camera()
     rotation = glm::vec3(0.0f, 0.0f, 0.0f);
     fovy = 60.0f;
     aspect = (float)width / (float)height;
-    near = 0.1f;
+    near = 0.0001f;
     far = 10000.0f;
     projectionMatrix = glm::perspective(glm::radians(fovy), aspect, near, far);
     update();

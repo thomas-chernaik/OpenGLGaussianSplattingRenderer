@@ -65,7 +65,7 @@ std::vector<glm::vec4> loadBins4(const std::string& filePath)
 
 TEST(SplatsTest, LoadFile)
 {
-    Splats splats("models/point_cloud.ply", 1000, 1000);
+    Splats splats("models/bike-big.ply", 1000, 1000);
     ASSERT_EQ(splats.numSplats, 3616103);
     std::vector<glm::vec3> means = loadBins("models/test/means.bin");
     // Compare to the means of the splats
