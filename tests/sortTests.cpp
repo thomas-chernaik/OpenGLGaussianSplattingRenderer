@@ -161,7 +161,7 @@ TEST(SortTest, SortTest) {
     std::cout << "compiling shaders" << std::endl;
     //createAndLinkSortShader();
     GLuint histogramProgram, sortProgram, sumProgram, paddingProgram;
-    createAndLinkSortAndHistogramShaders(histogramProgram, sortProgram, sumProgram, paddingProgram);
+    createAndLinkSortAndHistogramShaders(histogramProgram, sortProgram, sumProgram);
     std::cout << "compiled shaders" << std::endl;
 
     //create buffer
@@ -212,8 +212,8 @@ TEST(SortTest, SortTest) {
     //GPURadixSort(buffer, intermediateBuffer, randomNumbers.size());
     int size = randomNumbers.size();
 
-    GPURadixSort2(histogramProgram, sumProgram, sortProgram, intermediateBuffer, orderBuffer, histogramBuffer,
-                  size, 16, 32, buffer);
+    GPURadixSort(histogramProgram, sumProgram, sortProgram, intermediateBuffer, orderBuffer, histogramBuffer,
+                 size, 16, 32, buffer);
 //    //deep copy random numbers
     std::vector<float> randomNumbersCopy(randomNumbers);
 
@@ -236,15 +236,9 @@ TEST(SortTest, SortTest) {
         //get buffer data
         for (int i = 1; i < size; i++) {
             ASSERT_GE(randomNumbersCopy[outputBufferVector[i]], randomNumbersCopy[outputBufferVector[i - 1]]);
-            if(randomNumbersCopy[outputBufferVector[i]] < randomNumbersCopy[outputBufferVector[i - 1]]) {
-                //std::cout << i << std::endl;
-                errors++;
-                //std::cout << i << std::endl;
-            }
            ASSERT_EQ(randomNumbersCopy[outputBufferVector[i]], randomNumbers[i]);
 
         }
-        std::cout << "number of errors: " << errors << std::endl;
         std::cout << "Successfully sorted " << randomNumbers.size() << " numbers" << std::endl;
     } catch (std::exception& e) {
         //fail test

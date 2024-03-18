@@ -31,12 +31,8 @@ layout(std430, binding = 5) buffer SplatKeys {
     int data[];
 } splatKeys;
 
-//bounding radii buffer
-layout(std430, binding = 6) buffer BoundingRadii {
-    float data[];
-} boundingRadii;
 //depth buffer
-layout(std430, binding = 7) buffer DepthBuffer {
+layout(std430, binding = 6) buffer DepthBuffer {
     float data[];
 } depthBuffer;
 //num splats uniform
@@ -113,7 +109,6 @@ void main() {
             for (int j=0; j<1024; j++)
             {
                 vec2 projectedMean = sharedProjectedMeans[j];
-                //float radius = boundingRadii.data[index];
                 vec4 conic = sharedConicOpacities[j];
                 vec2 distance = pixelPosition - projectedMean;
                 //get the value of the conic

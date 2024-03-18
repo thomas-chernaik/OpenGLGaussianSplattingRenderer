@@ -52,15 +52,12 @@ layout (std430, binding = 5) buffer Conics {
     vec4 data[];
 } conics;
 
-layout (std430, binding = 6) buffer BoundingRadii {
-    float data[];
-} boundingRadii;
 
-layout (std430, binding = 7) buffer Indices {
+layout (std430, binding = 6) buffer Indices {
     int data[];
 } indices;
 
-layout (std430, binding = 8) buffer SplatKeys {
+layout (std430, binding = 7) buffer SplatKeys {
     int data[];
 } splatKeys;
 
@@ -87,7 +84,6 @@ void main()
         //set everything else to 0
         means2D.data[i] = vec2(0.0, 0.0);
         conics.data[i] = vec4(0.0, 0.0, 0.0, 0.0);
-        boundingRadii.data[i] = 0.0;
         splatKeys.data[i] = 0;
         return;
     }
@@ -150,7 +146,6 @@ void main()
     float lambda1 = middle + sqrt(max(0.1, middle * middle - determinant));
     float lambda2 = middle - sqrt(max(0.1, middle * middle - determinant));
     float radius = ceil(3.0 * sqrt(max(lambda1, lambda2)));
-    boundingRadii.data[i] = float(radius);
     float tileWidth = screenWidth / 16;
     float tileHeight = screenHeight / 16;
 
