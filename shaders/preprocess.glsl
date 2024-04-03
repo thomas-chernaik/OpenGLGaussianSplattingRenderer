@@ -134,13 +134,7 @@ void main()
     }
     float inverseDeterminant = 1.0 / determinant;
     conics.data[i] = vec4(vec3(covariance2DCompressed.z, -covariance2DCompressed.y, covariance2DCompressed.x) * inverseDeterminant, opacities.data[i]);
-    //conics.data[i] = vec4(viewMatrix3[0][0], viewMatrix3[0][1], viewMatrix3[0][2], viewMatrix3[1][0]);
-    //conics.data[i] = vec4(viewMatrix3[1][0], viewMatrix3[1][1], viewMatrix3[1][2], viewMatrix3[2][0]);
-    //conics.data[i] = vec4(viewMatrix3[2][0], viewMatrix3[2][1], viewMatrix3[2][2], viewMatrix3[2][0]);
-    //conics.data[i] = vec4(Jacobian[0][0], Jacobian[0][2], Jacobian[1][1], Jacobian[1][2]);
-    //conics.data[i] = vec4(T[0][0], T[0][1], T[0][2], T[1][0]);
-    //conics.data[i] = vec4(t.y);
-    //conics.data[i] = vec4(covariance2D[0][0], covariance2D[0][1], covariance2D[1][1], covariance2D[2][2]);
+
     // Calculate a bounding box for the conic
     float middle = (covariance2DCompressed.z + covariance2DCompressed.x) * 0.5;
     float lambda1 = middle + sqrt(max(0.1, middle * middle - determinant));

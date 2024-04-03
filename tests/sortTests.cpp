@@ -211,14 +211,17 @@ TEST(SortTest, SortTest) {
     //run program
     //GPURadixSort(buffer, intermediateBuffer, randomNumbers.size());
     int size = randomNumbers.size();
-
+    double currentTime = glfwGetTime();
     GPURadixSort(histogramProgram, sumProgram, sortProgram, intermediateBuffer, orderBuffer, histogramBuffer,
                  size, 16, 32, buffer);
+    glFinish();
+    std::cout << "GPU sort took " << glfwGetTime() - currentTime << " seconds" << std::endl;
+
 //    //deep copy random numbers
     std::vector<float> randomNumbersCopy(randomNumbers);
 
     //sort random numbers on cpu
-    double currentTime = glfwGetTime();
+    currentTime = glfwGetTime();
     //cpu sort to check
     std::sort(randomNumbers.begin(), randomNumbers.end(), [](float a, float b) {
         return a < b;

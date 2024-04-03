@@ -30,17 +30,22 @@ void main() {
     //store the histogram in shared memory
     histogram[localIndex] = prefixSum;
     //wait for all threads to finish with a shared memory barrier
-    barrier();
-    //if we are the first thread, calculate the global prefix sum, and store it in the global histogram buffer at the end
-    if(localIndex == 0)
+    memoryBarrierShared();
+
+    //compute the global prefix sum
+    for(uint i=0; i<4; i++)
     {
-        int globalPrefixSum = 0;
-        int index = numSections * 16;
-        for(int i=0; i<16; i++)
+        uint offset = 1 << i;
+        if(localIndex + offset < 16)
         {
-            globalHistogramsBuffer.data[index + i] = globalPrefixSum;
-            globalPrefixSum += histogram[i];
+            histogram[localIndex + offset] += histogram[localIndex];
         }
+        barrier();
     }
+    int index = numSections * 16;
+    if(localIndex == 0)
+        globalHistogramsBuffer.data[index + localIndex] = 0;
+    else
+        globalHistogramsBuffer.data[index + localIndex] = histogram[localIndex-1];
 
 }

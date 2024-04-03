@@ -68,42 +68,6 @@ void main() {
     {
         offsets[i] = globalHistogramsBuffer.data[i + (16*int(gl_GlobalInvocationID.x))];
     }
-    /*
-    //now we need to work out where each key will go in the output buffer
-    //we use two values
-    //the prefix sum, which is the sum of all values less than the current value
-    //the offset, which is the number of values the same as the current value, but lefter in the buffer
-    int offsets[keySize];
-    int globalHistogram[keySize];
-    int globalPrefixSum[keySize];
-    for (int i = 0; i < keySize; i++) {
-        globalHistogram[i] = 0;
-    }
-
-    //compute the global histogram and the offsets
-    for (int i = 0; i < numSections; i++)
-    {
-        for (int j = 0; j < keySize; j++)
-        {
-            //if we are at our section, we need to compute the offset
-            if (i == int(gl_GlobalInvocationID.x))
-            {
-                offsets[j] = globalHistogram[j];
-            }
-            //add the value to the global histogram
-            globalHistogram[j] += globalHistogramsBuffer.data[i * keySize + j];
-        }
-    }
-
-    //compute the global prefix sum
-    globalPrefixSum[0] = 0;
-    for (int i = 1; i < 16; i++)
-    {
-        globalPrefixSum[i] = globalPrefixSum[i - 1] + globalHistogram[i - 1];
-    }
-    */
-    int outputSize = 64;
-    int outputt[64];
     uint index;
     //write the output
     for(int i=startIdx; i < startIdx + localSectionSize; i++)
