@@ -1,4 +1,5 @@
 # 3D Splatting Rendering
+## [Read my dissertation here](https://thomas-chernaik.github.io/project.pdf)
 ![Render of a bike resting on a bench in a park](https://github.com/uol-feps-soc-comp3931-2324-classroom/final-year-project-thomas-chernaik/assets/60945086/b41d9935-25ab-4bb7-9f2a-3528657a8503)
 
 ## About
